@@ -1,3 +1,7 @@
 .venv
 merlDB_example
 teapot
+__pycache__
+merlDB
+brdfs*
+rendered_frames
