@@ -182,9 +182,10 @@ def BRDF(
     return diffuse + spec + clear
 
 # read brdf file number 0
-sample = np.load(f"{folder_brdfs}/brdf_1.npz", allow_pickle=True)
+sample = np.load(f"{folder_brdfs}/brdf_0.npz", allow_pickle=True)
 brdf = sample["brdf"]  # shape (RES_THETA_H, RES_THETA_D, RES_PHI_D, 3)
 params = sample["params"]
+print(params)
 
 # read angles file
 angles_file = np.load(f"{folder_brdfs}/angles.npz")
