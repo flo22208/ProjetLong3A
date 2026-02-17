@@ -181,22 +181,33 @@ def BRDF(
         
     return diffuse + spec + clear
 
-# read brdf file number 0
-sample = np.load(f"{folder_brdfs}/brdf_0.npz", allow_pickle=True)
-brdf = sample["brdf"]  # shape (RES_THETA_H, RES_THETA_D, RES_PHI_D, 3)
-params = sample["params"]
-print(params)
+brdf = None
+params = None
+theta_hs = None
+theta_ds = None
+phi_ds = None
 
-# read angles file
-angles_file = np.load(f"{folder_brdfs}/angles.npz")
-theta_hs = angles_file["theta_h"]
-theta_ds = angles_file["theta_d"]
-phi_ds = angles_file["phi_d"]
+def load_brdf(index=2):
+    global brdf, params, theta_hs, theta_ds, phi_ds
+
+    # Load selected BRDF
+    sample = np.load(f"{folder_brdfs}/brdf_{index}.npz", allow_pickle=True)
+    brdf = sample["brdf"]
+    params = sample["params"]
+
+    # Load angles (only once)
+    angles_file = np.load(f"{folder_brdfs}/angles.npz")
+    theta_hs = angles_file["theta_h"]
+    theta_ds = angles_file["theta_d"]
+    phi_ds = angles_file["phi_d"]
+
+    print(f"Loaded BRDF {index}")
+    print(params)
 
 def brdf_for_rendering(angles):
     """ angles : size (N,3) """
 
-    res = np.zeros(angles.shape)    
+    res = np.zeros(angles.shape)
 
     for (i, triplet) in enumerate(angles):
         phi_d, theta_d, theta_h = triplet

@@ -220,22 +220,29 @@ if __name__ == "__main__":
     parser.add_argument('--merldir', default='merlDB/db/brdfs/')
     parser.add_argument('--outdir', default='rendered_frames/')
     parser.add_argument('--mat', default=None)
+    parser.add_argument('--disneyid', default=None)
     args = parser.parse_args()
 
     renderer = Renderer(size=1000, save_path=args.outdir,nb_spheres=1,nb_tours=10,gamma=2.222)
-    # dbuilder = db.DBuilder(interp_method="linear",db_path=args.merldir)
-    # if not args.mat is None:
-    #     mat = args.mat
-    # else:
-    #     ldb = dbuilder.list_db()
-    #     mat = ldb[random.randint(0,len(ldb)-1)]
-    # dbuilder.load_mat(mat)
-    # print("Loaded " + mat)
-    # brdf = dbuilder.brdf_function(mat)
 
-    brdf = utilsBRDFDisney.brdf_for_rendering
+    if args.disneyid is None:
+        dbuilder = db.DBuilder(interp_method="linear",db_path=args.merldir)
+        if not args.mat is None:
+            mat = args.mat
+        else:
+            ldb = dbuilder.list_db()
+            mat = ldb[random.randint(0,len(ldb)-1)]
+        dbuilder.load_mat(mat)
+        print("Loaded " + mat)
+        brdf = dbuilder.brdf_function(mat)
+        name = mat
+    else :
+        utilsBRDFDisney.load_brdf(index=int(args.disneyid))
+        brdf = utilsBRDFDisney.brdf_for_rendering
+        name = "test"
+    
     t1 = time.time()
-    renderer.render(brdf, nb_images=10,name="test",MP=4)
+    renderer.render(brdf, nb_images=10,name=name,MP=10)
     t2 = time.time()
     print("Finished in", t2 -t1, "s")
     
