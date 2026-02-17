@@ -173,17 +173,18 @@ def BRDF(
     diffuse = (1 / PI) * mix(Fd, ss, subsurface) * Cdlin * (1 - metallic) + Fsheen
     spec = Gs * Fs * Ds
     clear = 0.25 * clearcoat * Gr * Fr * Dr
-
+    
     if (diffuse[0] + clear + spec[0] > 1) or (diffuse[1] + clear + spec[1] > 1) or (
         diffuse[2] + clear + spec[2] > 1
     ):
-        return -1,-1,-1
-    
+        return 1,1,1
+        
     return diffuse + spec + clear
 
 # read brdf file number 0
-sample = np.load(f"{folder_brdfs}/brdf_0.npz", allow_pickle=True)
+sample = np.load(f"{folder_brdfs}/brdf_1.npz", allow_pickle=True)
 brdf = sample["brdf"]  # shape (RES_THETA_H, RES_THETA_D, RES_PHI_D, 3)
+params = sample["params"]
 
 # read angles file
 angles_file = np.load(f"{folder_brdfs}/angles.npz")

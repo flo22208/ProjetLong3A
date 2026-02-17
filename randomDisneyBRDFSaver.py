@@ -88,6 +88,9 @@ for i in tqdm.tqdm(range(N)):
                     brdf[hi, di, pi] = vals
 
     # Save one file per material
+    maximum = np.max(brdf)
+    print(maximum)
+    # brdf /= maximum 
     np.savez(f"{folder_brdfs}/brdf_{i}.npz", params=material_params, brdf=brdf)
 
 # --- Load angles ---
