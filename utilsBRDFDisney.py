@@ -1,11 +1,13 @@
 import numpy as np
 import time
+import merlDB.database as db
 # ==========================
 # Parameters (defaults from shader)
 # ==========================
 
 PI = np.pi
 folder_brdfs = "brdfs_disney/"
+
 
 # ==========================
 # Helper functions
@@ -69,37 +71,44 @@ def rusinkiewicz_to_LV(theta_h, theta_d, phi_d):
     Y = np.array([0.0, 1.0, 0.0])
 
     # ----------------------
-    # 1. Construct half vector H
-    # φ_h = 0
+    # 1. Half vector (phi_h = 0)
     # ----------------------
     H = np.array([np.sin(theta_h), 0.0, np.cos(theta_h)])
 
-    # ----------------------
-    # 2. Build orthonormal frame around H
-    # ----------------------
-    tangent = np.cross(N, H)
-    if np.linalg.norm(tangent) != 0:
-        tangent /= np.linalg.norm(tangent)
-
-    bitangent = np.cross(H, tangent)
+    H /= np.linalg.norm(H)
 
     # ----------------------
-    # 3. Construct difference vector D
+    # 2. Build SAME frame as inverse
+    #    v1 = cross(n, h)
+    #    v2 = cross(v1, h)
     # ----------------------
-    D = (
-        np.sin(theta_d) * np.cos(phi_d) * tangent
-        + np.sin(theta_d) * np.sin(phi_d) * bitangent
-        + np.cos(theta_d) * H
+    if abs(H[2]) < 0.999:
+        v1 = np.cross(N, H)
+    else:
+        v1 = np.cross(Y, H)
+
+    v1 /= np.linalg.norm(v1)
+    v2 = np.cross(v1, H)
+
+    # ----------------------
+    # 3. Construct light direction
+    #    wi = cos(td) H
+    #         + sin(td)(cos(phi)v1 + sin(phi)v2)
+    # ----------------------
+    L = (
+        np.cos(theta_d) * H
+        + np.sin(theta_d) * np.cos(phi_d) * v1
+        + np.sin(theta_d) * np.sin(phi_d) * v2
     )
 
-    # ----------------------
-    # 4. Compute L and V
-    # ----------------------
-    L = D
-    V = 2 * np.dot(D, H) * H - D  # reflect D about H
-
-    # Normalize
     L /= np.linalg.norm(L)
+
+    # ----------------------
+    # 4. View from half definition
+    #    H = normalize(L + V)
+    #    => V = reflect(L about H)
+    # ----------------------
+    V = 2.0 * np.dot(L, H) * H - L
     V /= np.linalg.norm(V)
 
     return L, V, N, X, Y
@@ -173,13 +182,14 @@ def BRDF(
     diffuse = (1 / PI) * mix(Fd, ss, subsurface) * Cdlin * (1 - metallic) + Fsheen
     spec = Gs * Fs * Ds
     clear = 0.25 * clearcoat * Gr * Fr * Dr
-    
-    if (diffuse[0] + clear + spec[0] > 1) or (diffuse[1] + clear + spec[1] > 1) or (
-        diffuse[2] + clear + spec[2] > 1
-    ):
-        return 1,1,1
-        
+
+    # if (diffuse[0] + clear + spec[0] > 1) or (diffuse[1] + clear + spec[1] > 1) or (
+    #     diffuse[2] + clear + spec[2] > 1
+    # ):
+    #     return 1,1,1
+
     return diffuse + spec + clear
+
 
 brdf = None
 params = None
@@ -187,12 +197,14 @@ theta_hs = None
 theta_ds = None
 phi_ds = None
 
+
 def load_brdf(index=2):
     global brdf, params, theta_hs, theta_ds, phi_ds
 
     # Load selected BRDF
     sample = np.load(f"{folder_brdfs}/brdf_{index}.npz", allow_pickle=True)
     brdf = sample["brdf"]
+    brdf = brdf / (1.0 + brdf)
     params = sample["params"]
 
     # Load angles (only once)
@@ -204,32 +216,46 @@ def load_brdf(index=2):
     print(f"Loaded BRDF {index}")
     print(params)
 
+
 def brdf_for_rendering(angles):
-    """ angles : size (N,3) """
+    """angles : size (N,3)"""
 
     res = np.zeros(angles.shape)
 
-    for (i, triplet) in enumerate(angles):
+    for i, triplet in enumerate(angles):
         phi_d, theta_d, theta_h = triplet
 
-        # Find closest triplet in theta_hs, theta_ds and phi_ds
+        # Find closest triplet in theta_hs, theta_ds and phi_ds
         phi_d_idx = np.argmin(np.abs(phi_ds - phi_d))
         theta_d_idx = np.argmin(np.abs(theta_ds - theta_d))
         theta_h_idx = np.argmin(np.abs(theta_hs - theta_h))
 
-        # Get the corresponding RGB value
+        # Get the corresponding RGB value
         rgb = np.array(brdf[theta_h_idx, theta_d_idx, phi_d_idx])
         res[i] = rgb
-    
+
     return res
 
-if __name__ == "__main__":
-    brdf_for_rendering(np.array([[0.5, 0.1, 0.321],[2.8, 1.8, 0.321]]))
 
-    L = np.array([0, 0, 1])
-    V = np.array([0, 0, 1])
+if __name__ == "__main__":
+    res = rusinkiewicz_to_LV(np.pi / 4, np.pi / 4, np.pi / 4)
+    normal = np.array([res[2]])
+    light = np.array([res[0]])
+    view = np.array([res[1]])
+    print(light, view, normal)
+    print(db.rusinkiewicz_angles(normal, light, view))
+    # load_brdf(index=2)
+    # brdf_for_rendering(np.array([[0.5, 0.1, 0.321],[2.8, 1.8, 0.321]]))
+
+    L = np.array([0.3,  0.0, 0.8660254])
+    V = np.array([-0.3, 0.0, 0.8660254])
     N = np.array([0, 0, 1])
     X = np.array([1, 0, 0])
     Y = np.array([0, 1, 0])
-    res = BRDF(L, V, N, X, Y)
+    print(np.array([N]).shape)
+    phi_d, theta_d, theta_h = db.rusinkiewicz_angles(
+        np.array([N]), np.array([L]), np.array([V])
+    )
+    print(rusinkiewicz_to_LV(theta_h[0], theta_d[0], phi_d[0]))
 
+    res = BRDF(L, V, N, X, Y)

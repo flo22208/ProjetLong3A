@@ -53,7 +53,7 @@ def generate_brdf(i):
         "clearcoatGloss": clearcoatGloss,
     }
 
-    brdf = np.zeros((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3), dtype=np.float16)
+    brdf = np.zeros((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3), dtype=np.float32)
 
     for hi in range(MAX_THETA_H):
         for di in range(MAX_THETA_D):
@@ -73,7 +73,6 @@ def generate_brdf(i):
                     anisotropic, sheen, sheenTint,
                     clearcoat, clearcoatGloss
                 )
-
                 if vals[0] != -1:
                     brdf[hi, di, pi] = vals
 
