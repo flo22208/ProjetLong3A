@@ -78,17 +78,31 @@ def rusinkiewicz_to_LV(theta_h, theta_d, phi_d):
 
     # 4. On utilise EXACTEMENT le même repère que get_angles :
     #    n = (0,0,1), t = (1,0,0), et la même complete_basis
-    n = np.array([0.0, 0.0, 1.0])
+    N = np.array([0.0, 0.0, 1.0])
     t = np.array([1.0, 0.0, 0.0])
     X = np.array([1.0, 0.0, 0.0])
     Y = np.array([0.0, 1.0, 0.0])
-    M_tangent = complete_basis(n, t)
+    M_tangent = complete_basis(N, t)
 
     # 5. On repasse dans le repère monde
     L = M_tangent.T @ wi_tangent
     V = M_tangent.T @ wo_tangent
+    # 1. Empêcher L ou V d’être sous la surface
+    if np.dot(N, L) <= 1e-6:
+        L = L - 2 * np.dot(N, L) * N
+        L /= np.linalg.norm(L)
 
-    return L, V, n, X, Y
+    # if np.dot(N, V) <= 1e-6:
+    #     V = V - 2 * np.dot(N, V) * N
+    #     V /= np.linalg.norm(V)
+
+    # 2. Empêcher le cas D = 0 (L = V)
+    # if np.linalg.norm(L - V) < 1e-6:
+    #     # On pousse légèrement V
+    #     V = (V + 1e-3 * N)
+    #     V /= np.linalg.norm(V)
+
+    return L, V, N, X, Y
 
 
 # ==========================
