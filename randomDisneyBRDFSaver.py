@@ -11,9 +11,9 @@ RES_THETA_H = 90
 RES_THETA_D = 90
 RES_PHI_D = 180
 
-MAX_THETA_H = 90
-MAX_THETA_D = 90
-MAX_PHI_D = 180
+MAX_THETA_H = 45
+MAX_THETA_D = 45
+MAX_PHI_D = 90
 
 theta_hs = np.deg2rad(np.linspace(0, RES_THETA_H, MAX_THETA_H))
 theta_ds = np.deg2rad(np.linspace(0, RES_THETA_D, MAX_THETA_D))

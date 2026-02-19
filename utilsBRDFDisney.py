@@ -56,62 +56,39 @@ def mon2lin(x):
 def mix(a, b, t):
     return a * (1 - t) + b * t
 
+from convert_half_benj import (
+    halfangle_to_natural,
+    spherical_to_cartesian,
+    complete_basis,
+)
 
 def rusinkiewicz_to_LV(theta_h, theta_d, phi_d):
-    """
-    Convert Rusinkiewicz coordinates (with phi_h = 0)
-    to light and view direction vectors.
+    # 1. On fixe phi_h = 0 (convention Rusinkiewicz utilisée chez toi)
+    phi_h = 0.0
 
-    All angles in radians.
-    """
-
-    # Surface frame
-    N = np.array([0.0, 0.0, 1.0])
-    X = np.array([1.0, 0.0, 0.0])
-    Y = np.array([0.0, 1.0, 0.0])
-
-    # ----------------------
-    # 1. Half vector (phi_h = 0)
-    # ----------------------
-    H = np.array([np.sin(theta_h), 0.0, np.cos(theta_h)])
-
-    H /= np.linalg.norm(H)
-
-    # ----------------------
-    # 2. Build SAME frame as inverse
-    #    v1 = cross(n, h)
-    #    v2 = cross(v1, h)
-    # ----------------------
-    if abs(H[2]) < 0.999:
-        v1 = np.cross(N, H)
-    else:
-        v1 = np.cross(Y, H)
-
-    v1 /= np.linalg.norm(v1)
-    v2 = np.cross(v1, H)
-
-    # ----------------------
-    # 3. Construct light direction
-    #    wi = cos(td) H
-    #         + sin(td)(cos(phi)v1 + sin(phi)v2)
-    # ----------------------
-    L = (
-        np.cos(theta_d) * H
-        + np.sin(theta_d) * np.cos(phi_d) * v1
-        + np.sin(theta_d) * np.sin(phi_d) * v2
+    # 2. On passe des coordonnées half-angle (Rusinkiewicz)
+    #    aux coordonnées "naturelles" (theta_i, phi_i, theta_o, phi_o)
+    theta_i, phi_i, theta_o, phi_o = halfangle_to_natural(
+        theta_h, phi_h, theta_d, phi_d
     )
 
-    L /= np.linalg.norm(L)
+    # 3. On construit wi, wo dans le repère tangent
+    wi_tangent = spherical_to_cartesian(theta_i, phi_i)
+    wo_tangent = spherical_to_cartesian(theta_o, phi_o)
 
-    # ----------------------
-    # 4. View from half definition
-    #    H = normalize(L + V)
-    #    => V = reflect(L about H)
-    # ----------------------
-    V = 2.0 * np.dot(L, H) * H - L
-    V /= np.linalg.norm(V)
+    # 4. On utilise EXACTEMENT le même repère que get_angles :
+    #    n = (0,0,1), t = (1,0,0), et la même complete_basis
+    n = np.array([0.0, 0.0, 1.0])
+    t = np.array([1.0, 0.0, 0.0])
+    X = np.array([1.0, 0.0, 0.0])
+    Y = np.array([0.0, 1.0, 0.0])
+    M_tangent = complete_basis(n, t)
 
-    return L, V, N, X, Y
+    # 5. On repasse dans le repère monde
+    L = M_tangent.T @ wi_tangent
+    V = M_tangent.T @ wo_tangent
+
+    return L, V, n, X, Y
 
 
 # ==========================
@@ -160,6 +137,7 @@ def BRDF(
 
     Fss90 = LdotH**2 * roughness
     Fss = mix(1.0, Fss90, FL) * mix(1.0, Fss90, FV)
+    if abs(NdotL + NdotV - 0.5) < 1e-6: print("caca")
     ss = 1.25 * (Fss * (1 / (NdotL + NdotV) - 0.5) + 0.5)
 
     aspect = np.sqrt(1 - anisotropic * 0.9)

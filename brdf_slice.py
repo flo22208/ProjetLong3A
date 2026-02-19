@@ -13,6 +13,11 @@ def display_brdf_slice(brdf, phi_d_idx=90, mode="reinhard", exposure=1.0):
 
     slice_ = brdf[:, :, phi_d_idx].astype(np.float32)  # (H, D, 3)
 
+    # --- FLIP AXES HERE ---
+    # We want: img[h, d] → img[d, h]
+    slice_ = np.transpose(slice_, (1, 0, 2))  # (D, H, 3)
+
+    # Tonemapping
     if mode == "reinhard":
         x = slice_ * exposure
         img = x / (1.0 + x)
@@ -27,17 +32,18 @@ def display_brdf_slice(brdf, phi_d_idx=90, mode="reinhard", exposure=1.0):
     img = np.clip(img, 0, 1)
 
     plt.figure(figsize=(8, 8))
-    plt.imshow(img, origin="lower",
-               extent=[0, 90, 0, 90],  # theta_d, theta_h both 0-90°
-               aspect="equal")
-    plt.xlabel("theta_d (degrees)")
-    plt.ylabel("theta_h (degrees)")
+    plt.imshow(
+        img,
+        extent=[0, 90, 0, 90],  # now: x = theta_h, y = theta_d
+        aspect="equal"
+    )
+    plt.xlabel("theta_h (degrees)")
+    plt.ylabel("theta_d (degrees)")
     plt.title(f"BRDF slice at phi_d index {phi_d_idx} [{mode}]")
     plt.colorbar(label="Tonemapped intensity")
     plt.tight_layout()
     plt.show()
-
-
+    
 if __name__ == "__main__":
-    utilsBRDFDisney.load_brdf(index=int(7))
-    display_brdf_slice(utilsBRDFDisney.brdf, phi_d_idx=179, mode="reinhard")
+    utilsBRDFDisney.load_brdf(index=int(0))
+    display_brdf_slice(utilsBRDFDisney.brdf, phi_d_idx=0, mode="reinhard")
