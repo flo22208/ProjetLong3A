@@ -1,6 +1,7 @@
 import numpy as np
 from utilsBRDFDisney import rusinkiewicz_to_LV
 from convert_half_benj import get_angles
+import merlDB.database as db
 
 def angle_diff_phi(a, b):
     d = a - b
@@ -30,7 +31,12 @@ def test_rusinkiewicz_function():
 
         L, V, n, _, t = rusinkiewicz_to_LV(theta_h, phi_h, theta_d, phi_d)
 
-        _,_,_,_,theta_h2, phi_h2, theta_d2, phi_d2 = get_angles(L, V, n, t)
+        phi_d2, theta_d2, theta_h2 = db.rusinkiewicz_angles(np.array([n]), np.array([L]), np.array([V]))
+        
+        phi_d2 = phi_d2[0]
+        theta_d2 = theta_d2[0]
+        theta_h2 = theta_h2[0]
+        phi_h2 = phi_h
 
         max_err_theta_h = max(max_err_theta_h, angle_diff_theta(theta_h, theta_h2))
         max_err_phi_h   = max(max_err_phi_h,   angle_diff_phi(phi_h,  phi_h2))
