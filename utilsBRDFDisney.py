@@ -2,7 +2,7 @@ import numpy as np
 import time
 import merlDB.database as db
 # ==========================
-# Parameters (defaults from shader)
+# Parameters
 # ==========================
 
 PI = np.pi
@@ -10,7 +10,7 @@ folder_brdfs = "brdfs_disney/"
 
 
 # ==========================
-# Helper functions
+# Helper functions for Disney BRDF
 # ==========================
 def clamp(x, a=0.0, b=1.0):
     return max(a, min(b, x))
@@ -55,55 +55,6 @@ def mon2lin(x):
 
 def mix(a, b, t):
     return a * (1 - t) + b * t
-
-from convert_half_benj import (
-    halfangle_to_natural,
-    spherical_to_cartesian,
-    complete_basis,
-)
-
-def rusinkiewicz_to_LV(theta_h, theta_d, phi_d):
-    # 1. On fixe phi_h = 0 (convention Rusinkiewicz utilisée chez toi)
-    phi_h = 0.0
-
-    # 2. On passe des coordonnées half-angle (Rusinkiewicz)
-    #    aux coordonnées "naturelles" (theta_i, phi_i, theta_o, phi_o)
-    theta_i, phi_i, theta_o, phi_o = halfangle_to_natural(
-        theta_h, phi_h, theta_d, phi_d
-    )
-
-    # 3. On construit wi, wo dans le repère tangent
-    wi_tangent = spherical_to_cartesian(theta_i, phi_i)
-    wo_tangent = spherical_to_cartesian(theta_o, phi_o)
-
-    # 4. On utilise EXACTEMENT le même repère que get_angles :
-    #    n = (0,0,1), t = (1,0,0), et la même complete_basis
-    N = np.array([0.0, 0.0, 1.0])
-    t = np.array([1.0, 0.0, 0.0])
-    X = np.array([1.0, 0.0, 0.0])
-    Y = np.array([0.0, 1.0, 0.0])
-    M_tangent = complete_basis(N, t)
-
-    # 5. On repasse dans le repère monde
-    L = M_tangent.T @ wi_tangent
-    V = M_tangent.T @ wo_tangent
-    # 1. Empêcher L ou V d’être sous la surface
-    if np.dot(N, L) <= 1e-6:
-        L = L - 2 * np.dot(N, L) * N
-        L /= np.linalg.norm(L)
-
-    # if np.dot(N, V) <= 1e-6:
-    #     V = V - 2 * np.dot(N, V) * N
-    #     V /= np.linalg.norm(V)
-
-    # 2. Empêcher le cas D = 0 (L = V)
-    # if np.linalg.norm(L - V) < 1e-6:
-    #     # On pousse légèrement V
-    #     V = (V + 1e-3 * N)
-    #     V /= np.linalg.norm(V)
-
-    return L, V, N, X, Y
-
 
 # ==========================
 # Main BRDF function
@@ -151,7 +102,7 @@ def BRDF(
 
     Fss90 = LdotH**2 * roughness
     Fss = mix(1.0, Fss90, FL) * mix(1.0, Fss90, FV)
-    if abs(NdotL + NdotV - 0.5) < 1e-6: print("caca")
+    # if abs(NdotL + NdotV) < 1e-6: print("caca")
     ss = 1.25 * (Fss * (1 / (NdotL + NdotV) - 0.5) + 0.5)
 
     aspect = np.sqrt(1 - anisotropic * 0.9)
@@ -182,6 +133,90 @@ def BRDF(
 
     return diffuse + spec + clear
 
+# ==========================
+# Other helpers
+# ==========================
+
+def rotate_normal(vec, theta):
+    """
+    Rotate vector around z-axis by theta radians.
+    Equivalent to Eigen::AngleAxis(theta, (0,0,1))
+    """
+    cos_t = np.cos(theta)
+    sin_t = np.sin(theta)
+
+    vec2 = np.copy(vec)
+    vec2[0] = cos_t * vec[0] - sin_t * vec[1]
+    vec2[1] = sin_t * vec[0] + cos_t * vec[1]
+    return vec2
+
+
+def rotate_binormal(vec, theta):
+    """
+    Rotate vector around y-axis by theta radians.
+    Equivalent to Eigen::AngleAxis(theta, (0,1,0))
+    """
+    cos_t = np.cos(theta)
+    sin_t = np.sin(theta)
+
+    vec2 = np.copy(vec)
+    vec2[0] = cos_t * vec[0] + sin_t * vec[2]
+    vec2[2] = -sin_t * vec[0] + cos_t * vec[2]
+    return vec2
+
+
+def rusinkiewicz_to_LV(theta_h, phi_h, theta_d, phi_d):
+    """
+    Convert half/difference parameterization to Cartesian wi and wo.
+
+    Returns:
+        np.array shape (6,)
+        [wi_x, wi_y, wi_z, wo_x, wo_y, wo_z]
+    """
+
+    # --- Half vector (spherical → Cartesian)
+    half = np.array([
+        np.sin(theta_h) * np.cos(phi_h),
+        np.sin(theta_h) * np.sin(phi_h),
+        np.cos(theta_h)
+    ])
+
+    # --- Difference vector (local frame)
+    wi = np.array([
+        np.sin(theta_d) * np.cos(phi_d),
+        np.sin(theta_d) * np.sin(phi_d),
+        np.cos(theta_d)
+    ])
+
+    # --- Rotate into world frame
+    wi = rotate_binormal(wi, theta_h)
+    wi = rotate_normal(wi, phi_h)
+
+    # --- Reflect wi about half to get wo
+    dot = np.dot(wi, half)
+    wo = -wi + 2.0 * dot * half
+
+    N = np.array([0.0, 0.0, 1.0])
+    X = np.array([1.0, 0.0, 0.0])
+    Y = np.array([0.0, 1.0, 0.0])
+
+    return wi, wo, N, X, Y
+
+def orthogonal_vector(v):
+    """
+    Returns a 3D vector orthogonal to input v.
+    Uses cross product with a safe basis vector.
+    """
+    if np.allclose(v, 0):
+        raise ValueError("Cannot find orthogonal vector to zero vector")
+    # Index of largest abs component
+    i = np.argmax(np.abs(v))
+    # Basis vector e_i
+    e = np.ones(3)
+    e[i] = - (v[(i+1) % len(v)] + v[(i+2) % len(v)]) / v[i]
+    # Cross product gives orthogonal vector
+    w = np.cross(v, e)
+    return w
 
 brdf = None
 params = None
@@ -190,7 +225,10 @@ theta_ds = None
 phi_ds = None
 
 
-def load_brdf(index=2):
+def load_brdf_file(index=2):
+    """
+    Load BRDF from file located at "{folder_brdfs}/brdf_{index}.npz"
+    """
     global brdf, params, theta_hs, theta_ds, phi_ds
 
     # Load selected BRDF
@@ -210,7 +248,10 @@ def load_brdf(index=2):
 
 
 def brdf_for_rendering(angles):
-    """angles : size (N,3)"""
+    """
+    Function that fetches BRDF values in the "brdf" variable for all angles in angles
+    angles : size (N,3)
+    """
 
     res = np.zeros(angles.shape)
 
@@ -228,26 +269,42 @@ def brdf_for_rendering(angles):
 
     return res
 
+def brdf_for_rendering_vec(light_dirs, view_dirs, normals):
+    """
+    Function that computes BRDF for all light_dirs, view_dirs, normals
+    """
+
+    res = np.zeros((light_dirs.shape))
+
+    for i in range(len(light_dirs)):
+        L,V,N = light_dirs[i], view_dirs[i], normals[i]
+        N = N / np.linalg.norm(N)
+        X = orthogonal_vector(N)
+        X = X / np.linalg.norm(X)
+        Y = np.cross(X,N)
+        rgb = BRDF(L,V,N,X,Y)
+        rgb = rgb / (1.0 + rgb)
+
+        res[i] = rgb
+
+    return res
+
 
 if __name__ == "__main__":
-    res = rusinkiewicz_to_LV(np.pi / 4, np.pi / 4, np.pi / 4)
-    normal = np.array([res[2]])
-    light = np.array([res[0]])
-    view = np.array([res[1]])
-    print(light, view, normal)
-    print(db.rusinkiewicz_angles(normal, light, view))
+    L,V,N,X,Y = rusinkiewicz_to_LV(np.pi / 4, 0, np.pi / 4, np.pi / 4)
+    phi_d, theta_d, theta_h = db.rusinkiewicz_angles(np.array([N]), np.array([L]), np.array([V]))
+    print((theta_h[0], 0, theta_d[0], phi_d[0]))
     # load_brdf(index=2)
     # brdf_for_rendering(np.array([[0.5, 0.1, 0.321],[2.8, 1.8, 0.321]]))
 
-    L = np.array([0.3,  0.0, 0.8660254])
-    V = np.array([-0.3, 0.0, 0.8660254])
+    L = np.array([0.85355339, 0.5       , 0.14644661])
+    V = np.array([0.14644661,-0.5       , 0.85355339])
     N = np.array([0, 0, 1])
     X = np.array([1, 0, 0])
     Y = np.array([0, 1, 0])
-    print(np.array([N]).shape)
     phi_d, theta_d, theta_h = db.rusinkiewicz_angles(
         np.array([N]), np.array([L]), np.array([V])
     )
-    print(rusinkiewicz_to_LV(theta_h[0], theta_d[0], phi_d[0]))
+    print(rusinkiewicz_to_LV(theta_h[0], 0, theta_d[0], phi_d[0]))
 
-    res = BRDF(L, V, N, X, Y)
+    # res = BRDF(L, V, N, X, Y)

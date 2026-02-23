@@ -66,6 +66,7 @@ def render_brdf_vector(view_dirs, normals, light_dirs, brdf):
     phi_d, theta_d, theta_h = db.rusinkiewicz_angles(normals, light_dirs, view_dirs)
     # print(np.reshape(np.stack((phi_d, theta_d, theta_h), axis=-1), (-1,3)))
     rendered = brdf(np.reshape(np.stack((phi_d, theta_d, theta_h), axis=-1), (-1,3)))
+    # rendered = brdf(light_dirs, view_dirs, normals)
     # print(rendered.shape)
     return rendered
 

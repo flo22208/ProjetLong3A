@@ -11,9 +11,9 @@ RES_THETA_H = 90
 RES_THETA_D = 90
 RES_PHI_D = 180
 
-MAX_THETA_H = 45
-MAX_THETA_D = 45
-MAX_PHI_D = 90
+MAX_THETA_H = 90
+MAX_THETA_D = 90
+MAX_PHI_D = 180
 
 theta_hs = np.deg2rad(np.linspace(0, RES_THETA_H, MAX_THETA_H))
 theta_ds = np.deg2rad(np.linspace(0, RES_THETA_D, MAX_THETA_D))
@@ -62,8 +62,8 @@ def generate_brdf(i):
                 theta_d = theta_ds[di]
                 phi_d = phi_ds[pi]
 
-                L, V, N_vec, X, Y = utilsBRDFDisney.rusinkiewicz_to_LV(
-                    theta_h, theta_d, phi_d
+                L, V, N_vec, X, Y = utilsBRDFDisney.half_to_cartesian(
+                    theta_h, 0, theta_d, phi_d
                 )
 
                 vals = utilsBRDFDisney.BRDF(
