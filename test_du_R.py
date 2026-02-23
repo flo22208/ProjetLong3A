@@ -31,7 +31,7 @@ def test_rusinkiewicz_function():
 
         L, V, n, _, t = rusinkiewicz_to_LV(theta_h, phi_h, theta_d, phi_d)
 
-        phi_d2, theta_d2, theta_h2 = db.rusinkiewicz_angles(np.array([n]), np.array([L]), np.array([V]))
+        phi_d2, theta_d2, theta_h2 = db.rusinkiewicz_angles(np.array([n]), np.array([L]), np.array([V]), False)
         
         phi_d2 = phi_d2[0]
         theta_d2 = theta_d2[0]
