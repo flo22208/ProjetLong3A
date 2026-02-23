@@ -62,7 +62,7 @@ def generate_brdf(i):
                 theta_d = theta_ds[di]
                 phi_d = phi_ds[pi]
 
-                L, V, N_vec, X, Y = utilsBRDFDisney.half_to_cartesian(
+                L, V, N_vec, X, Y = utilsBRDFDisney.rusinkiewicz_to_LV(
                     theta_h, 0, theta_d, phi_d
                 )
 

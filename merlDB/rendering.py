@@ -238,7 +238,7 @@ if __name__ == "__main__":
         brdf = dbuilder.brdf_function(mat)
         name = mat
     else :
-        utilsBRDFDisney.load_brdf(index=int(args.disneyid))
+        utilsBRDFDisney.load_brdf_file(index=int(args.disneyid))
         brdf = utilsBRDFDisney.brdf_for_rendering
         name = "test"
     
