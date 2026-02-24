@@ -1,6 +1,5 @@
 import numpy as np
-import random
-import utilsBRDFDisney
+from numpyBRDF import BRDF, rusinkiewicz_to_LV
 import tqdm
 import os
 from concurrent.futures import ProcessPoolExecutor
@@ -62,11 +61,11 @@ def generate_brdf(i):
                 theta_d = theta_ds[di]
                 phi_d = phi_ds[pi]
 
-                L, V, N_vec, X, Y = utilsBRDFDisney.rusinkiewicz_to_LV(
+                L, V, N_vec, X, Y = rusinkiewicz_to_LV(
                     theta_h, 0, theta_d, phi_d
                 )
 
-                vals = utilsBRDFDisney.BRDF(
+                vals = BRDF(
                     L, V, N_vec, X, Y,
                     baseColor, metallic, subsurface,
                     specular, roughness, specularTint,

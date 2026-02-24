@@ -1,6 +1,5 @@
 import numpy as np
-from utilsBRDFDisney import rusinkiewicz_to_LV
-from convert_half_benj import get_angles
+from numpyBRDF import rusinkiewicz_to_LV
 import merlDB.database as db
 
 def angle_diff_phi(a, b):

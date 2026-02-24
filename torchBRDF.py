@@ -4,9 +4,9 @@ import math
 
 PI = math.pi
 
-# ------------------------------------------------------------
-# Helper functions (vectorized)
-# ------------------------------------------------------------
+# ==========================
+# Helper functions for Torch Disney BRDF
+# ==========================
 
 def schlick_fresnel(u):
     return (1 - u).clamp(0, 1) ** 5
@@ -54,52 +54,11 @@ def mix(a, b, t):
 def mon2lin(x):
     return x ** 2.2
 
-def create_rusinkiewicz_grid(device):
-    D, H, W = 90, 90, 180
+# ==========================
+# Main BRDF function
+# ==========================
 
-    theta_h = torch.linspace(0, PI/2, D, device=device)
-    theta_d = torch.linspace(0, PI/2, H, device=device)
-    phi_d   = torch.linspace(0, PI, W, device=device)
-
-    theta_h, theta_d, phi_d = torch.meshgrid(
-        theta_h, theta_d, phi_d, indexing='ij'
-    )
-
-    # Half vector (phi_h = 0)
-    half = torch.stack([
-        torch.sin(theta_h),
-        torch.zeros_like(theta_h),
-        torch.cos(theta_h)
-    ], dim=-1)  # (D,H,W,3)
-
-    # Difference vector in local frame
-    wi = torch.stack([
-        torch.sin(theta_d) * torch.cos(phi_d),
-        torch.sin(theta_d) * torch.sin(phi_d),
-        torch.cos(theta_d)
-    ], dim=-1)
-
-    # Rotate wi by theta_h around Y
-    cos_th = torch.cos(theta_h)
-    sin_th = torch.sin(theta_h)
-
-    wi_rot = torch.zeros_like(wi)
-    wi_rot[..., 0] = cos_th * wi[..., 0] + sin_th * wi[..., 2]
-    wi_rot[..., 1] = wi[..., 1]
-    wi_rot[..., 2] = -sin_th * wi[..., 0] + cos_th * wi[..., 2]
-
-    wi = wi_rot
-
-    # Reflect wi about half to get wo
-    dot = (wi * half).sum(-1, keepdim=True)
-    wo = -wi + 2 * dot * half
-
-    N = torch.tensor([0.,0.,1.], device=device)
-    N = N.view(1,1,1,3)
-
-    return wi, wo, N
-
-def disney_brdf_torch(params, wi, wo, N):
+def BRDF(params, wi, wo, N):
     """
     params: (B,12) in [0,1]
     wi, wo: (D,H,W,3)
@@ -161,10 +120,6 @@ def disney_brdf_torch(params, wi, wo, N):
 
     Csheen = mix(torch.ones_like(Cdlin), Ctint, sheenTint)
 
-    # -----------------------
-    # Diffuse + Subsurface
-    # -----------------------
-
     FL = schlick_fresnel(NdotL)
     FV = schlick_fresnel(NdotV)
 
@@ -187,10 +142,6 @@ def disney_brdf_torch(params, wi, wo, N):
         (1 - metallic)
     )  + Fsheen
 
-    # -----------------------
-    # Specular (anisotropic formulation preserved)
-    # -----------------------
-
     aspect = torch.sqrt(1 - anisotropic * 0.9)
     ax = torch.clamp(roughness**2 / aspect, min=0.001)
     ay = torch.clamp(roughness**2 * aspect, min=0.001)
@@ -205,11 +156,7 @@ def disney_brdf_torch(params, wi, wo, N):
     )
 
     spec = Gs * Fs * Ds
-
-    # -----------------------
-    # Clearcoat
-    # -----------------------
-
+    
     Dr = GTR1(NdotH, mix(0.1, 0.001, clearcoatGloss))
     Fr = mix(0.04, 1.0, FH)
     Gr = smithG_GGX(NdotL, 0.25) * smithG_GGX(NdotV, 0.25)
@@ -218,12 +165,59 @@ def disney_brdf_torch(params, wi, wo, N):
 
     return diffuse + spec + clear
 
+# ==========================
+# Torch rusinkiewicz to LV
+# ==========================
 
+def rusinkiewicz_to_LV(device):
+    D, H, W = 90, 90, 180
+
+    theta_h = torch.linspace(0, PI/2, D, device=device)
+    theta_d = torch.linspace(0, PI/2, H, device=device)
+    phi_d   = torch.linspace(0, PI, W, device=device)
+
+    theta_h, theta_d, phi_d = torch.meshgrid(
+        theta_h, theta_d, phi_d, indexing='ij'
+    )
+
+    # Half vector (phi_h = 0)
+    half = torch.stack([
+        torch.sin(theta_h),
+        torch.zeros_like(theta_h),
+        torch.cos(theta_h)
+    ], dim=-1)  # (D,H,W,3)
+
+    # Difference vector in local frame
+    wi = torch.stack([
+        torch.sin(theta_d) * torch.cos(phi_d),
+        torch.sin(theta_d) * torch.sin(phi_d),
+        torch.cos(theta_d)
+    ], dim=-1)
+
+    # Rotate wi by theta_h around Y
+    cos_th = torch.cos(theta_h)
+    sin_th = torch.sin(theta_h)
+
+    wi_rot = torch.zeros_like(wi)
+    wi_rot[..., 0] = cos_th * wi[..., 0] + sin_th * wi[..., 2]
+    wi_rot[..., 1] = wi[..., 1]
+    wi_rot[..., 2] = -sin_th * wi[..., 0] + cos_th * wi[..., 2]
+
+    wi = wi_rot
+
+    # Reflect wi about half to get wo
+    dot = (wi * half).sum(-1, keepdim=True)
+    wo = -wi + 2 * dot * half
+
+    N = torch.tensor([0.,0.,1.], device=device)
+    N = N.view(1,1,1,3)
+
+    return wi, wo, N
 
 if __name__ == "__main__":
     device = "cuda"
 
-    wi, wo, N = create_rusinkiewicz_grid(device)
+    wi, wo, N = rusinkiewicz_to_LV(device)
 
     params = torch.tensor(
         [[
@@ -242,4 +236,4 @@ if __name__ == "__main__":
         device=device
     )
 
-    torch_output = disney_brdf_torch(params, wi, wo, N)[0].cpu().numpy()
+    torch_output = BRDF(params, wi, wo, N)[0].cpu().numpy()
