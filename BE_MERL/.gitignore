@@ -1,0 +1,12 @@
+*.bsdf
+*.binary
+*.png
+*.exr
+*.jpg
+/matpreview
+*.pt
+*.xlm
+*.serialized
+*.bin
+/.vscode
+/__pycache__

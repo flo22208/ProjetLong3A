@@ -1,0 +1,6 @@
+<bsdf type="roughplastic">
+    <rgb name="diffuse_reflectance" value="0.1259, 0.3438, 0.9900"/>
+    <float name="alpha" value="0.1528"/>
+    <string name="distribution" value="ggx"/>
+    <string name="int_ior" value="polypropylene"/>
+</bsdf>
