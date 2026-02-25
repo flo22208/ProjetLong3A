@@ -5,3 +5,4 @@ __pycache__
 brdfs*
 rendered_frames
 *.pt
+checkpoints

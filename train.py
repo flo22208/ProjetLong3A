@@ -20,7 +20,7 @@ except ImportError:
     print("Warning: model.py not found")
     EncoderViT3D = None
 
-
+from model import EncoderViT3D
 
 def setup_output_dirs(outdir, checkpoint_dir):
     """Crée les répertoires de sortie"""
@@ -80,7 +80,7 @@ def train_epoch_disney(wi, wo, N, model, batch_size, BRDF, optimizer, device, ep
     rgbs = torch.einsum('bdhwc->bcdhw', rgbs)
 
     # Forward pass avec mixed precision
-    with torch.cuda.amp.autocast():
+    with torch.amp.autocast(device_type=device.type):
         loss, pred_params = model(
             rgbs, params_disney
         )
@@ -136,8 +136,8 @@ if __name__ == "__main__":
     dim_latent = 12#768                # Dimension de l'espace latent
 
     # Paramètres d'entraînement
-    epochs = 5                     # Nombre d'epochs
-    batch_size = 12                  # Batch size 
+    epochs = 150                    # Nombre d'epochs
+    batch_size = 20                  # Batch size 
     lr = 1e-3                      # Learning rate
     
 
@@ -239,7 +239,7 @@ if __name__ == "__main__":
             wi, wo, N, model, batch_size, BRDF, optimizer, device, epoch, args=train_args
         )
         
-        scaler = torch.cuda.amp.GradScaler()  # Add outside loop
+        scaler = torch.amp.GradScaler(device=device)  # Add outside loop
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
@@ -262,3 +262,6 @@ if __name__ == "__main__":
     ## enregistrer les poids du modèle final
     final_model_path = os.path.join(outdir, 'encoder_disney.pt')
     torch.save(model.state_dict(), final_model_path)
+
+    ## test
+    
