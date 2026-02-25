@@ -5,11 +5,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.utils.data as torchdata
-from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 from tqdm import tqdm
 from datetime import datetime
 import matplotlib.pyplot as plt
+
+from torchBRDF import BRDF, rusinkiewicz_to_LV
 
 import math
 import sys
@@ -21,22 +22,18 @@ except ImportError:
 
 
 
-from psnr_result import psnr
-
-
 def setup_output_dirs(outdir, checkpoint_dir):
     """Crée les répertoires de sortie"""
     os.makedirs(outdir, exist_ok=True)
     os.makedirs(checkpoint_dir, exist_ok=True)
 
 
-def save_checkpoint(model, optimizer, checkpoint_dir, epoch, best_acc):
+def save_checkpoint(model, optimizer, checkpoint_dir, epoch):
     """Sauvegarde un checkpoint"""
     checkpoint = {
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-        'best_accuracy': best_acc
     }
     
     checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}.pt')
@@ -50,11 +47,14 @@ def save_checkpoint(model, optimizer, checkpoint_dir, epoch, best_acc):
 
 
 
-def train_epoch_disney(model, BRDF, optimizer, device, epoch, args=None):
+def train_epoch_disney(wi, wo, N, model, batch_size, BRDF, optimizer, device, epoch, args=None):
     """
     Entraîne le modèle Transformer avec supervision pour une epoch
     
     Args:
+        wi: Vecteurs lumière générés à partir de Rusinkiewicz
+        wo: Vecteurs vue genérés à partir de Rusinkiewicz
+        N: Normales genérés à partir de Rusinkiewicz
         model: Modèle Transformer à entraîner
         BRDF: Fonction de BRDF à utiliser
         optimizer: Optimiseur
@@ -63,37 +63,32 @@ def train_epoch_disney(model, BRDF, optimizer, device, epoch, args=None):
         args: Arguments d'entraînement
     
     Returns:
-        float: Valeur de loss réduite
+        type de loss de nn: loss
     """
     model.train(True)
     
-    header = 'Epoch: [{}]'.format(epoch)
-    print_freq = 20
-    
     optimizer.zero_grad()
     
-    for data_iter_step, batch_data in enumerate(metric_logger.log_every(data_loader, print_freq, header)):
-        
-        # TODO : tirer params disney 12 batchs, lancer BRDF et postprocess
+    # Paramètres disney aléatoires et évaluation de la BRDF
+    params_disney = torch.rand(batch_size, 12, device=device)
+    rgbs = BRDF(params_disney, wi, wo, N)
 
-        # Forward pass avec mixed precision
-        with torch.cuda.amp.autocast():
-            loss, pred_params = model(
-                samples
-            )
-        
-        loss_value = loss.item()
-        
-        # Vérifier si la loss est finie
-        if not math.isfinite(loss_value):
-            print(f"Loss is {loss_value}, stopping training")
-            sys.exit(1)
-        
-        if (data_iter_step + 1) % accum_iter == 0:
-            optimizer.zero_grad()
-        
-        torch.cuda.synchronize()
+    # Tonemapping
+    mask = torch.isinf(rgbs)
+    rgbs = rgbs / (1 + rgbs)
+    rgbs[mask] = 1.0
+    rgbs = torch.einsum('bdhwc->bcdhw', rgbs)
+
+    # Forward pass avec mixed precision
+    with torch.cuda.amp.autocast():
+        loss, pred_params = model(
+            rgbs, params_disney
+        )
     
+    # Vérifier si la loss est finie
+    # if not math.isfinite(loss):
+    #     print(f"Loss is {loss}, stopping training")
+    #     sys.exit(1)    
 
     return loss
 
@@ -229,21 +224,27 @@ if __name__ == "__main__":
     print("STARTING TRAINING")
     print("="*70 + "\n")
     
-    best_accuracy = 0
     losses_history = {
         'total': [],
         'train_acc': [],
     }
-    
+    wi, wo, N = rusinkiewicz_to_LV(device)
+
     for epoch in range(epochs):
         print(f"\nEpoch {epoch+1}/{epochs}")
         print("-" * 70)
 
         # Entraînement
-        avg_loss = train_epoch_disney(
-            model, BRDF, optimizer, device, epoch, args=train_args
+        loss = train_epoch_disney(
+            wi, wo, N, model, batch_size, BRDF, optimizer, device, epoch, args=train_args
         )
         
+        scaler = torch.cuda.amp.GradScaler()  # Add outside loop
+        scaler.scale(loss).backward()
+        scaler.step(optimizer)
+        scaler.update()
+
+        avg_loss = loss.item()
         # Logging
         print(f"Train Loss: {avg_loss:.6f}")
 
@@ -254,43 +255,10 @@ if __name__ == "__main__":
             
         # Sauvegarder tous les 20 epochs
         if (epoch + 1) % 200 == 0:
-            save_checkpoint(model, optimizer, checkpoint_dir, epoch, best_accuracy)
-    
-    writer.close()
-
-    # Visualisation finale
-    print("\n" + "="*70)
-    print("GENERATING FINAL PCA VISUALIZATION")
-    print("="*70)
-    
-    pca_dir = os.path.join(outdir, 'pca_plots')
-    
-    # PCA finale sur le train set (2D et 3D)
-    visualize_mae_latent_space_supervised(
-        mae, train_loader, device, 
-        epoch=epochs, 
-        save_dir=pca_dir,
-        n_samples=len(train_dataset),  # Tous les échantillons
-        show_plot=True,  # Afficher à la fin
-        use_3d=True  # Générer aussi la version 3D
-    )
-    
-    # PCA finale sur le test set si disponible
-    if test_loader:
-        visualize_mae_latent_space_supervised(
-            mae, test_loader, device, 
-            epoch=epochs, 
-            save_dir=os.path.join(pca_dir, 'test'),
-            n_samples=len(test_dataset),
-            show_plot=True,
-            use_3d=True
-        )
+            save_checkpoint(model, optimizer, checkpoint_dir, epoch)
     
     print("="*70)
 
     ## enregistrer les poids du modèle final
-    final_model_path = os.path.join(outdir, 'mae_final_supervised.pt')
-    torch.save(mae.state_dict(), final_model_path)
-
-    ## visualiation des psnr
-    print("\n" + "="*70)
+    final_model_path = os.path.join(outdir, 'encoder_disney.pt')
+    torch.save(model.state_dict(), final_model_path)
