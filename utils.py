@@ -1,5 +1,4 @@
 import numpy as np
-import merlDB.database as db
 from numpyBRDF import BRDF
 
 folder_brdfs = "brdfs_disney/"
@@ -96,18 +95,4 @@ def brdf_for_rendering_vec(light_dirs, view_dirs, normals):
     return res
 
 if __name__ == "__main__":
-    L,V,N,X,Y = rusinkiewicz_to_LV(np.pi / 4, 0, np.pi / 4, np.pi / 4)
-    phi_d, theta_d, theta_h = db.rusinkiewicz_angles(np.array([N]), np.array([L]), np.array([V]))
-    print((theta_h[0], 0, theta_d[0], phi_d[0]))
-    # load_brdf(index=2)
-    # brdf_for_rendering(np.array([[0.5, 0.1, 0.321],[2.8, 1.8, 0.321]]))
-
-    L = np.array([0.85355339, 0.5       , 0.14644661])
-    V = np.array([0.14644661,-0.5       , 0.85355339])
-    N = np.array([0, 0, 1])
-    X = np.array([1, 0, 0])
-    Y = np.array([0, 1, 0])
-    phi_d, theta_d, theta_h = db.rusinkiewicz_angles(
-        np.array([N]), np.array([L]), np.array([V])
-    )
-    print(rusinkiewicz_to_LV(theta_h[0], 0, theta_d[0], phi_d[0]))
+    pass
