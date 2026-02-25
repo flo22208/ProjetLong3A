@@ -3,6 +3,8 @@ import torch.nn as nn
 
 import numpy as np
 
+from model import EncoderViT3D
+
 folder_brdfs = "brdfs_disney/"
 
 def load_brdf_file(index=2):
@@ -14,7 +16,7 @@ def load_brdf_file(index=2):
     sample = np.load(f"{folder_brdfs}/brdf_{index}.npz", allow_pickle=True)
     brdf = sample["brdf"]
     brdf = brdf / (1.0 + brdf)
-    params = sample["params"]
+    params = sample["params"].item()
 
     # Load angles (only once)
     angles_file = np.load(f"{folder_brdfs}/angles.npz")
@@ -31,14 +33,18 @@ brdf, params, theta_hs, theta_ds, phi_ds = load_brdf_file()
 
 ## Convert to torch tensor
 rgbs = torch.tensor(brdf)
+params = [params['baseColor'][0], params['baseColor'][1], params['baseColor'][2], params['metallic'], params['subsurface'], params['specular'], params['roughness'], params['specularTint'], params['sheen'], params['sheenTint'], params['clearcoat'], params['clearcoatGloss']]
 params_disney = torch.tensor(params)
 
-params_disney = torch.repeat_interleave(params_disney, 12, dim=0)
 
-rgbs = torch.einsum('bdhwc->bcdhw', rgbs)
+
+rgbs = rgbs.permute(3, 0, 1, 2)   # C D H W
+rgbs = rgbs.unsqueeze(0)         # 1 C D H W
 
 ## load model for .pt file
-model = torch.jit.load('results/encoder_disney.pt')
+model = EncoderViT3D()        # instantiate architecture first
+model.load_state_dict(torch.load("results/encoder_disney.pt"))
+model.eval()
 
 ## predict
 loss, pred_params = model(
@@ -46,3 +52,5 @@ loss, pred_params = model(
         )
 
 print(loss)
+print(pred_params)
+print(params_disney)

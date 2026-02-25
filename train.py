@@ -136,8 +136,8 @@ if __name__ == "__main__":
     dim_latent = 12#768                # Dimension de l'espace latent
 
     # Paramètres d'entraînement
-    epochs = 150                    # Nombre d'epochs
-    batch_size = 20                  # Batch size 
+    epochs = 500                    # Nombre d'epochs
+    batch_size = 5                  # Batch size 
     lr = 1e-3                      # Learning rate
     
 
@@ -264,4 +264,3 @@ if __name__ == "__main__":
     torch.save(model.state_dict(), final_model_path)
 
     ## test
-    
