@@ -136,9 +136,9 @@ if __name__ == "__main__":
     dim_latent = 12#768                # Dimension de l'espace latent
 
     # Paramètres d'entraînement
-    epochs = 500                    # Nombre d'epochs
-    batch_size = 5                  # Batch size 
-    lr = 1e-3                      # Learning rate
+    epochs = 1000                    # Nombre d'epochs
+    batch_size = 20                 # Batch size 
+    lr = 2e-3                      # Learning rate
     
 
     # Chemins et répertoires

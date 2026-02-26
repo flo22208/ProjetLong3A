@@ -25,7 +25,7 @@ def load_brdf_file(index=2):
     phi_ds = angles_file["phi_d"]
 
     print(f"Loaded BRDF {index}")
-    print(params)
+    # print(params)
 
     return brdf, params, theta_hs, theta_ds, phi_ds
 
@@ -35,7 +35,7 @@ brdf, params, theta_hs, theta_ds, phi_ds = load_brdf_file()
 rgbs = torch.tensor(brdf)
 params = [params['baseColor'][0], params['baseColor'][1], params['baseColor'][2], params['metallic'], params['subsurface'], params['specular'], params['roughness'], params['specularTint'], params['sheen'], params['sheenTint'], params['clearcoat'], params['clearcoatGloss']]
 params_disney = torch.tensor(params)
-
+params_disney = params_disney.unsqueeze(0)  # Add batch dimension
 
 
 rgbs = rgbs.permute(3, 0, 1, 2)   # C D H W
