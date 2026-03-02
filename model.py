@@ -91,7 +91,7 @@ class PatchEmbed3D(nn.Module):
 class EncoderViT3D(nn.Module):
     """ Encoder with VisionTransformer backbone for 3D Data
     """
-    def __init__(self, img_size=(90, 90, 180), patch_size=(90, 90, 180), in_chans=3,
+    def __init__(self, img_size=(90, 90, 180), patch_size=(15, 15, 15), in_chans=3,
                  embed_dim=12, depth=12, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm):
         super().__init__()
 
@@ -154,6 +154,7 @@ class EncoderViT3D(nn.Module):
     def forward(self, brdfs, gt_params):
         pred_params = self.forward_encoder(brdfs)
         pred_params = pred_params.squeeze(1)
+        pred_params = torch.sigmoid(pred_params)
         loss = self.forward_loss(gt_params, pred_params)
         return loss, pred_params
 

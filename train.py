@@ -47,7 +47,7 @@ def save_checkpoint(model, optimizer, checkpoint_dir, epoch):
 
 
 
-def train_epoch_disney(wi, wo, N, model, batch_size, BRDF, optimizer, device, epoch, args=None):
+def train_epoch_disney(wi, wo, N, model, batch_size, dim_latent, BRDF, optimizer, device, epoch, args=None):
     """
     Entraîne le modèle Transformer avec supervision pour une epoch
     
@@ -70,7 +70,7 @@ def train_epoch_disney(wi, wo, N, model, batch_size, BRDF, optimizer, device, ep
     optimizer.zero_grad()
     
     # Paramètres disney aléatoires et évaluation de la BRDF
-    params_disney = torch.rand(batch_size, 12, device=device)
+    params_disney = torch.rand(batch_size, dim_latent, device=device)
     rgbs = BRDF(params_disney, wi, wo, N)
 
     # Tonemapping
@@ -137,7 +137,7 @@ if __name__ == "__main__":
 
     # Paramètres d'entraînement
     epochs = 1000                    # Nombre d'epochs
-    batch_size = 20                 # Batch size 
+    batch_size = 20                # Batch size 
     lr = 1e-3                      # Learning rate
     
 
@@ -236,7 +236,7 @@ if __name__ == "__main__":
 
         # Entraînement
         loss = train_epoch_disney(
-            wi, wo, N, model, batch_size, BRDF, optimizer, device, epoch, args=train_args
+            wi, wo, N, model, batch_size, dim_latent, BRDF, optimizer, device, epoch, args=train_args
         )
         
         scaler = torch.amp.GradScaler(device=device)  # Add outside loop
