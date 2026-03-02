@@ -13,7 +13,8 @@ import argparse
 
 sys.path.append("..")
 
-import utilsBRDFDisney
+import numpyBRDF
+import utils
 
 def pixel_viex_dirs_ortho(n,m):
     """Compute the view direction associated with every pixel for orthographic projection
@@ -238,8 +239,8 @@ if __name__ == "__main__":
         brdf = dbuilder.brdf_function(mat)
         name = mat
     else :
-        utilsBRDFDisney.load_brdf_file(index=int(args.disneyid))
-        brdf = utilsBRDFDisney.brdf_for_rendering
+        utils.load_brdf_file(index=int(args.disneyid))
+        brdf = utils.brdf_for_rendering
         name = "test"
     
     t1 = time.time()

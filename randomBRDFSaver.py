@@ -1,6 +1,7 @@
+import argparse
+
 import numpy as np
-import random
-import utilsBRDFDisney
+from numpyBRDF import BRDF, rusinkiewicz_to_LV
 import tqdm
 import os
 from concurrent.futures import ProcessPoolExecutor
@@ -23,7 +24,7 @@ phi_ds = np.deg2rad(np.linspace(0, RES_PHI_D, MAX_PHI_D))
 np.savez(f"{folder_brdfs}/angles.npz", theta_h=theta_hs, theta_d=theta_ds, phi_d=phi_ds)
 
 
-def generate_brdf(i):
+def generate_brdf_random(i):
     # Make randomness process-safe
     rng = np.random.default_rng(seed=i)
 
@@ -62,11 +63,70 @@ def generate_brdf(i):
                 theta_d = theta_ds[di]
                 phi_d = phi_ds[pi]
 
-                L, V, N_vec, X, Y = utilsBRDFDisney.rusinkiewicz_to_LV(
+                L, V, N_vec, X, Y = rusinkiewicz_to_LV(
                     theta_h, 0, theta_d, phi_d
                 )
 
-                vals = utilsBRDFDisney.BRDF(
+                vals = BRDF(
+                    L, V, N_vec, X, Y,
+                    baseColor, metallic, subsurface,
+                    specular, roughness, specularTint,
+                    anisotropic, sheen, sheenTint,
+                    clearcoat, clearcoatGloss
+                )
+                if vals[0] != -1:
+                    brdf[hi, di, pi] = vals
+
+    np.savez(f"{folder_brdfs}/brdf_{i}.npz",
+             params=material_params,
+             brdf=brdf)
+
+    return i
+
+def generate_brdf_fixed(i, params):
+    # Make randomness process-safe
+    rng = np.random.default_rng(seed=i)
+
+    baseColor = params[0:3]
+    metallic = params[3]
+    subsurface = params[4]
+    specular = params[5]
+    roughness = params[6]
+    specularTint = params[7]
+    anisotropic = 0.0
+    sheen = params[8]
+    sheenTint = params[9]
+    clearcoat = params[10]
+    clearcoatGloss = params[11]
+
+    material_params = {
+        "baseColor": baseColor,
+        "metallic": metallic,
+        "subsurface": subsurface,
+        "specular": specular,
+        "roughness": roughness,
+        "specularTint": specularTint,
+        "anisotropic": anisotropic,
+        "sheen": sheen,
+        "sheenTint": sheenTint,
+        "clearcoat": clearcoat,
+        "clearcoatGloss": clearcoatGloss,
+    }
+
+    brdf = np.zeros((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3), dtype=np.float32)
+
+    for hi in range(MAX_THETA_H):
+        for di in range(MAX_THETA_D):
+            for pi in range(MAX_PHI_D):
+                theta_h = theta_hs[hi]
+                theta_d = theta_ds[di]
+                phi_d = phi_ds[pi]
+
+                L, V, N_vec, X, Y = rusinkiewicz_to_LV(
+                    theta_h, 0, theta_d, phi_d
+                )
+
+                vals = BRDF(
                     L, V, N_vec, X, Y,
                     baseColor, metallic, subsurface,
                     specular, roughness, specularTint,
@@ -83,11 +143,21 @@ def generate_brdf(i):
     return i
 
 if __name__ == "__main__":
+    ## parse cli arguments for fixed BRDF generation
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--fixed', default=[], help='Whether to generate a fixed BRDF (True) or random ones (False)')
+    args = parser.parse_args()
+
+    if args.fixed != []:
+        args = [float(x) for x in args.fixed.split(',')]
+        generate_brdf_fixed(0, np.array(args))
+        exit(0)
+    
     N = 10
     os.makedirs(folder_brdfs, exist_ok=True)
 
     with ProcessPoolExecutor() as executor:
-        list(tqdm.tqdm(executor.map(generate_brdf, range(N)), total=N))
+        list(tqdm.tqdm(executor.map(generate_brdf_random, range(N)), total=N))
 
     # --- Load angles ---
     angles = np.load(f"{folder_brdfs}/angles.npz")
