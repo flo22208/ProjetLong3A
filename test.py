@@ -5,6 +5,8 @@ import numpy as np
 
 from model import EncoderViT3D
 
+from torchBRDF import BRDF, rusinkiewicz_to_LV
+
 folder_brdfs = "brdfs_disney/"
 
 def load_brdf_file(index=2):
@@ -29,7 +31,7 @@ def load_brdf_file(index=2):
 
     return brdf, params, theta_hs, theta_ds, phi_ds
 
-brdf, params, theta_hs, theta_ds, phi_ds = load_brdf_file()
+brdf, params, theta_hs, theta_ds, phi_ds = load_brdf_file(0)
 
 ## Convert to torch tensor
 rgbs = torch.tensor(brdf)
@@ -44,7 +46,18 @@ rgbs = rgbs.unsqueeze(0)         # 1 C D H W
 ## load model for .pt file
 model = EncoderViT3D()        # instantiate architecture first
 model.load_state_dict(torch.load("results/encoder_disney.pt"))
+model.to('cuda')
 model.eval()
+
+params_disney = torch.rand(12, 12, device='cuda')
+wi, wo, N = rusinkiewicz_to_LV('cuda')
+rgbs = BRDF(params_disney, wi, wo, N)
+
+# Tonemapping
+mask = torch.isinf(rgbs)
+rgbs = rgbs / (1 + rgbs)
+rgbs[mask] = 1.0
+rgbs = torch.einsum('bdhwc->bcdhw', rgbs)
 
 ## predict
 loss, pred_params = model(
@@ -54,3 +67,7 @@ loss, pred_params = model(
 print(loss)
 print(pred_params)
 print(params_disney)
+
+## Fetch first from batch
+gt = pred_params[0]
+pred = params_disney[0]
