@@ -100,6 +100,7 @@ class EncoderViT3D(nn.Module):
         self.patch_embed = PatchEmbed3D(img_size, patch_size, in_chans, embed_dim)
         num_patches = self.patch_embed.num_patches
 
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, embed_dim), requires_grad=False)
         self.blocks = nn.ModuleList([
             Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer)
@@ -111,7 +112,7 @@ class EncoderViT3D(nn.Module):
 
 
     def initialize_weights(self):
-        pos_embed = get_3d_sincos_pos_embed(self.pos_embed.shape[-1], self.patch_embed.grid_size, cls_token=False)
+        pos_embed = get_3d_sincos_pos_embed(self.pos_embed.shape[-1], self.patch_embed.grid_size, cls_token=True)
         self.pos_embed.data.copy_(torch.from_numpy(pos_embed).float().unsqueeze(0))
 
         w = self.patch_embed.proj.weight.data
@@ -135,6 +136,11 @@ class EncoderViT3D(nn.Module):
         # add pos embed w/o cls token
         x = x + self.pos_embed[:, 1:, :]
 
+        # append cls token
+        cls_token = self.cls_token + self.pos_embed[:, :1, :]
+        cls_tokens = cls_token.expand(x.shape[0], -1, -1)
+        x = torch.cat((cls_tokens, x), dim=1)
+
         # apply Transformer blocks
         for blk in self.blocks:
             x = blk(x)
@@ -153,10 +159,10 @@ class EncoderViT3D(nn.Module):
 
     def forward(self, brdfs, gt_params):
         pred_params = self.forward_encoder(brdfs)
-        pred_params = pred_params.squeeze(1)
-        pred_params = torch.sigmoid(pred_params)
-        loss = self.forward_loss(gt_params, pred_params)
-        return loss, pred_params
+        pred_params_cls_token = pred_params[:, :1, :]
+        pred_params_cls_token = torch.sigmoid(pred_params_cls_token)
+        loss = self.forward_loss(gt_params, pred_params_cls_token)
+        return loss, pred_params_cls_token
 
 if __name__ == '__main__':
     wi, wo, N = rusinkiewicz_to_LV('cuda')
