@@ -138,7 +138,7 @@ if __name__ == "__main__":
     # Paramètres d'entraînement
     epochs = 1000                    # Nombre d'epochs
     batch_size = 20                 # Batch size 
-    lr = 2e-3                      # Learning rate
+    lr = 1e-3                      # Learning rate
     
 
     # Chemins et répertoires
