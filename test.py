@@ -69,5 +69,5 @@ print(pred_params)
 print(params_disney)
 
 ## Fetch first from batch
-gt = pred_params[0]
-pred = params_disney[0]
+pred = pred_params[0]
+gt = params_disney[0]
