@@ -136,7 +136,7 @@ if __name__ == "__main__":
     dim_latent = 12#768                # Dimension de l'espace latent
 
     # Paramètres d'entraînement
-    epochs = 1000                    # Nombre d'epochs
+    epochs = 3000                   # Nombre d'epochs
     batch_size = 20                # Batch size 
     lr = 1e-3                      # Learning rate
     
@@ -230,6 +230,8 @@ if __name__ == "__main__":
     }
     wi, wo, N = rusinkiewicz_to_LV(device)
 
+    scaler = torch.amp.GradScaler(device=device)
+    
     for epoch in range(epochs):
         print(f"\nEpoch {epoch+1}/{epochs}")
         print("-" * 70)
@@ -238,8 +240,7 @@ if __name__ == "__main__":
         loss = train_epoch_disney(
             wi, wo, N, model, batch_size, dim_latent, BRDF, optimizer, device, epoch, args=train_args
         )
-        
-        scaler = torch.amp.GradScaler(device=device)  # Add outside loop
+          
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
@@ -263,4 +264,10 @@ if __name__ == "__main__":
     final_model_path = os.path.join(outdir, 'encoder_disney.pt')
     torch.save(model.state_dict(), final_model_path)
 
-    ## test
+    ## plot des courbes de loss
+    plt.figure(figsize=(10, 5))
+    plt.plot(losses_history['total'], label='Total Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.title('Training Loss over Epochs')
+    plt.savefig(os.path.join(outdir, 'training_loss.png'))

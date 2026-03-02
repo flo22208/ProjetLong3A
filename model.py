@@ -159,7 +159,7 @@ class EncoderViT3D(nn.Module):
 
     def forward(self, brdfs, gt_params):
         pred_params = self.forward_encoder(brdfs)
-        pred_params_cls_token = pred_params[:, :1, :]
+        pred_params_cls_token = pred_params[:, :1, :].squeeze(1)
         pred_params_cls_token = torch.sigmoid(pred_params_cls_token)
         loss = self.forward_loss(gt_params, pred_params_cls_token)
         return loss, pred_params_cls_token
