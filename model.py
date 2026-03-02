@@ -92,7 +92,7 @@ class EncoderViT3D(nn.Module):
     """ Encoder with VisionTransformer backbone for 3D Data
     """
     def __init__(self, img_size=(90, 90, 180), patch_size=(15, 15, 15), in_chans=3,
-                 embed_dim=12, depth=12, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm):
+                 embed_dim=12, latent_space_dim=12,depth=12, num_heads=12, mlp_ratio=4., norm_layer=nn.LayerNorm):
         super().__init__()
 
         # --------------------------------------------------------------------------
@@ -106,6 +106,7 @@ class EncoderViT3D(nn.Module):
             Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer)
             for i in range(depth)])
         self.norm = norm_layer(embed_dim)
+        self.reduction = nn.Linear(embed_dim, latent_space_dim)
 
         self.loss = nn.MSELoss()
         self.initialize_weights()
@@ -146,6 +147,11 @@ class EncoderViT3D(nn.Module):
             x = blk(x)
         x = self.norm(x)
 
+        x = x[:, :1, :].squeeze(1)
+        x = self.reduction(x)
+
+        x = torch.sigmoid(x)
+
         return x
 
     def forward_loss(self, gt_params, pred_params):
@@ -158,9 +164,8 @@ class EncoderViT3D(nn.Module):
 
 
     def forward(self, brdfs, gt_params):
-        pred_params = self.forward_encoder(brdfs)
-        pred_params_cls_token = pred_params[:, :1, :].squeeze(1)
-        pred_params_cls_token = torch.sigmoid(pred_params_cls_token)
+        pred_params_cls_token = self.forward_encoder(brdfs)
+        
         loss = self.forward_loss(gt_params, pred_params_cls_token)
         return loss, pred_params_cls_token
 
@@ -201,7 +206,7 @@ if __name__ == '__main__':
     params = torch.repeat_interleave(params, 12, dim=0)
 
     # set arch
-    mae_brdf = EncoderViT3D() # decoder: 512 dim, 8 blocks
+    mae_brdf = EncoderViT3D(embed_dim=768) # decoder: 512 dim, 8 blocks
     mae_brdf.to('cuda')
 
     print(mae_brdf(torch_output, params))
