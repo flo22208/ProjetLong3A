@@ -133,10 +133,11 @@ def get_final_prediction(model, BRDF, device):
 if __name__ == "__main__":
       
     # Paramètres du modèle MAE
+    embed_dim = 12                # Dimension des embeddings
     dim_latent = 12#768                # Dimension de l'espace latent
 
     # Paramètres d'entraînement
-    epochs = 3000                   # Nombre d'epochs
+    epochs = 500                   # Nombre d'epochs
     batch_size = 20                # Batch size 
     lr = 1e-3                      # Learning rate
     
@@ -197,7 +198,8 @@ if __name__ == "__main__":
         raise ImportError("Encoder model not available")
     
     model = EncoderViT3D(
-        embed_dim=dim_latent,
+        embed_dim=embed_dim,
+        latent_space_dim=dim_latent
     )
     model.to(device)
     

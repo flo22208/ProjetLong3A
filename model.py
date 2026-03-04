@@ -106,7 +106,7 @@ class EncoderViT3D(nn.Module):
             Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer)
             for i in range(depth)])
         self.norm = norm_layer(embed_dim)
-        self.reduction = nn.Linear(embed_dim, latent_space_dim)
+        # self.reduction = nn.Linear(embed_dim, latent_space_dim)
 
         self.loss = nn.MSELoss()
         self.initialize_weights()
@@ -148,7 +148,7 @@ class EncoderViT3D(nn.Module):
         x = self.norm(x)
 
         x = x[:, :1, :].squeeze(1)
-        x = self.reduction(x)
+        # x = self.reduction(x)
 
         x = torch.sigmoid(x)
 
