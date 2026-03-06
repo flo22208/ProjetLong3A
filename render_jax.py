@@ -18,29 +18,39 @@ def init_param():
         "subsurface": jnp.array(scale * np.random.randn()),
         "specular": jnp.array(scale * np.random.randn()),
         "roughness": jnp.array(scale * np.random.randn()),
+        # "specularTint": jnp.array(scale * np.random.randn()),
+        # "anisotropic": jnp.array(scale * np.random.randn()),
         "sheen": jnp.array(scale * np.random.randn()),
+        # "sheenTint": jnp.array(scale * np.random.randn()),
         "clearcoat": jnp.array(scale * np.random.randn()),
+        # "clearcoatGloss": jnp.array(scale * np.random.randn()),
     }
     return material_params
     
 def loss_fn(params, L, V, N, X, Y, brdf_target):
     baseColor = jax.nn.sigmoid(params["baseColor"])
-    metallic  = jax.nn.sigmoid(params["metallic"])
-    specular  = jax.nn.sigmoid(params["specular"])
-    roughness = jax.nn.sigmoid(params["roughness"])
-    sheen     = jax.nn.sigmoid(params["sheen"])
-    clearcoat = jax.nn.sigmoid(params["clearcoat"])
+    metallic = jax.nn.sigmoid(params["metallic"])
     subsurface = jax.nn.sigmoid(params["subsurface"])
+    specular = jax.nn.sigmoid(params["specular"])
+    roughness = jax.nn.sigmoid(params["roughness"])
+    specularTint = 0.0 #jax.nn.sigmoid(params["specularTint"])
+    anisotropic = 0.0 # jax.nn.sigmoid(params["anisotropic"])
+    sheen = jax.nn.sigmoid(params["sheen"])
+    sheenTint = 0.0 # jax.nn.sigmoid(params["sheenTint"])
+    clearcoat = jax.nn.sigmoid(params["clearcoat"])
+    clearcoatGloss = 0.0 # jax.nn.sigmoid(params["clearcoatGloss"])
+
     pred = BRDF_jitted(L, V, N, X, Y, baseColor=baseColor,
     metallic=metallic,
     subsurface=subsurface,
     specular=specular,
-    specularTint=0.0,
     roughness=roughness,
+    specularTint=specularTint,
+    anisotropic=anisotropic,
     sheen=sheen,
-    sheenTint=0,
+    sheenTint=sheenTint,
     clearcoat=clearcoat,
-    clearcoatGloss=0)
+    clearcoatGloss=clearcoatGloss)
     pred = pred / (1.0 + pred) # tone mapping
     # eps = 1e-6
     # loss = jnp.mean((pred - brdf_target)**2) # MSE 2)
@@ -76,18 +86,8 @@ def optimize_params(TH, TD, PH, brdf_target, steps=1000, lr=1e-2): # 2000 5e-3
         loss_hist.append(loss)
         
     params = {k: jax.nn.sigmoid(v) for k, v in params.items()}
-    pred_finale = BRDF_jitted(L, V, N, X, Y, baseColor=params["baseColor"],
-    metallic=params["metallic"],
-    subsurface=params["subsurface"],
-    specular=params["specular"],
-    specularTint=0.0,
-    roughness=params["roughness"],
-    sheen=params["sheen"],
-    sheenTint=0,
-    clearcoat=params["clearcoat"],
-    clearcoatGloss=0)
 
-    return params, params_init_jax, loss, loss_hist, pred_finale
+    return params, params_init_jax, loss, loss_hist
 
 def test():
     print("Test égalité Jax-Numpy")
@@ -153,7 +153,7 @@ if __name__ == "__main__":
     # Create full meshgrid
     TH, TD, PH = jnp.meshgrid(theta_hs, theta_ds, phi_ds, indexing="ij")
     t1 = time.time()
-    params, params_init_jax, loss_finale, loss_hist, pred_finale = optimize_params(TH, TD, PH, brdf_target, steps=1000, lr=5e-2)
+    params, params_init_jax, loss_finale, loss_hist = optimize_params(TH, TD, PH, brdf_target, steps=1000, lr=5e-2)
     t2 = time.time()
     print(f"Finished in {(t2-t1):3f} s")
     print("\n=== Parameters comparison ===")
@@ -169,8 +169,6 @@ if __name__ == "__main__":
     plt.ylabel("Loss")
     plt.title("BRDF fitting loss")
     plt.show()
-    np.savez(f"brdfs_disney/brdf_pred.npz",
-             params=params,
-             brdf=pred_finale)
+
     abs_global = np.mean([v for v in abs_params.values()])
     print(f"\nDifférence absolue globale paramètres : {abs_global:.4f}")
