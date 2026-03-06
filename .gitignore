@@ -1,8 +1,5 @@
 .venv
-merlDB_example
-teapot
 __pycache__
-brdfs*
-rendered_frames
+*.npz
 *.pt
-checkpoints
+*.png

@@ -5,10 +5,10 @@ import optax
 import numpy as np
 import jax.numpy as jnp
 import numpyBRDF
-from randomBRDFSaver import MAX_PHI_D, MAX_THETA_D, MAX_THETA_H, RES_PHI_D, RES_THETA_D, RES_THETA_H
-import utils_jax
+from BRDFSaver import MAX_PHI_D, MAX_THETA_D, MAX_THETA_H, RES_PHI_D, RES_THETA_D, RES_THETA_H
+import jaxBRDF
 
-BRDF_jitted = jax.jit(utils_jax.BRDF_jax)
+BRDF_jitted = jax.jit(jaxBRDF.BRDF_jax)
 
 def init_param():
     scale = 0.5    
@@ -56,7 +56,7 @@ def loss_fn(params, L, V, N, X, Y, brdf_target):
 def optimize_params(TH, TD, PH, brdf_target, steps=1000, lr=1e-2): # 2000 5e-3
     params = init_param()
     params_init_jax = params
-    L, V, N, X, Y = utils_jax.rusinkiewicz_to_LV_jax(TH, 0.0, TD, PH)
+    L, V, N, X, Y = jaxBRDF.rusinkiewicz_to_LV_jax(TH, 0.0, TD, PH)
     # 1) Créer l’optimiseur
     optimizer = optax.adam(lr)
     opt_state = optimizer.init(params)
@@ -106,8 +106,8 @@ def test():
     theta_ds = np.deg2rad(np.linspace(0, RES_THETA_D, MAX_THETA_D))
     phi_ds = np.deg2rad(np.linspace(0, RES_PHI_D, MAX_PHI_D))
     TH, TD, PH = jnp.meshgrid(theta_hs, theta_ds, phi_ds, indexing="ij")
-    L, V, N, X, Y = utils_jax.rusinkiewicz_to_LV_jax(TH, 0.0, TD, PH)
-    out_jax = utils_jax.BRDF_jax(L, V, N, X, Y, baseColor,metallic,subsurface,specular,
+    L, V, N, X, Y = jaxBRDF.rusinkiewicz_to_LV_jax(TH, 0.0, TD, PH)
+    out_jax = jaxBRDF.BRDF_jax(L, V, N, X, Y, baseColor,metallic,subsurface,specular,
     roughness,specularTint,anisotropic,
     sheen,sheenTint,clearcoat,clearcoatGloss)
     brdf = np.zeros((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3), dtype=np.float32)
