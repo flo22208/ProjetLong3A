@@ -4,9 +4,14 @@ import random
 from merlDB import database as db
 import numpy as np
 
+epochs = 3000
+embed_dim = 96
+latent_space_dim = 10
+where_zeros = [4, 7, 9, 11]
+
 ## load model for .pt file
-model = EncoderViT3D()        # instantiate architecture first
-model.load_state_dict(torch.load("results/encoder_disney_12_0.038.pt"))
+model = EncoderViT3D(embed_dim=embed_dim, latent_space_dim=latent_space_dim)        # instantiate architecture first
+model.load_state_dict(torch.load("results/encoder_disney_96_10_3000_20_0.0096.pt"))
 model.to('cuda')
 model.eval()
 
@@ -15,7 +20,7 @@ model.eval()
 dbuilder = db.DBuilder(interp_method="linear",db_path='merlDB/db/brdfs/')
 ldb = dbuilder.list_db()
 mat = ldb[1]
-mat = "dark-blue-paint"
+mat = "blue-acrylic"
 dbuilder.load_mat(mat)
 print("Loaded " + mat)
 brdf = dbuilder.brdf_function(mat)
@@ -46,9 +51,12 @@ for hi in range(MAX_THETA_H):
             idx += 1
 
 rgbs = brdf(angles)
+rgbs = 1.0 / (1.0 + rgbs)  # tonemapping
 
 ## Resize to MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3
 rgbs = rgbs.reshape((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3))
+
+print(rgbs)
 
 ## Convert to torch tensor
 rgbs = torch.tensor(rgbs, dtype=torch.float32)
@@ -62,11 +70,11 @@ params = torch.tensor(
             0.0,                # subsurface
             0.5,                # specular
             0.5,                # roughness
-            0.0,                # specularTint
+#            0.0,                # specularTint
             0.0,                # sheen
             0.5,                # sheenTint
             0.0,                # clearcoat
-            1.0                 # clearcoatGloss
+#            1.0                 # clearcoatGloss
         ]],
         dtype=torch.float32,
         device='cuda'
