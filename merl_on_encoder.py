@@ -1,17 +1,26 @@
+import os
 from model import EncoderViT3D
 import torch
 import random
 from merlDB import database as db
 import numpy as np
 
+output_folder = "results/merl_on_encoder/"
+os.makedirs(output_folder, exist_ok=True)
+
 epochs = 3000
 embed_dim = 96
-latent_space_dim = 10
+latent_space_dim = 8
 where_zeros = [4, 7, 9, 11]
+# where_zeros = [7, 11]
+# where_zeros = []
+batch_size = 20
+
+model_file = f"results/encoder_disney_{embed_dim}_{latent_space_dim}_{epochs}_{batch_size}_0.0088.pt"
 
 ## load model for .pt file
 model = EncoderViT3D(embed_dim=embed_dim, latent_space_dim=latent_space_dim)        # instantiate architecture first
-model.load_state_dict(torch.load("results/encoder_disney_96_10_3000_20_0.0096.pt"))
+model.load_state_dict(torch.load(model_file))
 model.to('cuda')
 model.eval()
 
@@ -19,12 +28,6 @@ model.eval()
 ## load BRDF from MERL database
 dbuilder = db.DBuilder(interp_method="linear",db_path='merlDB/db/brdfs/')
 ldb = dbuilder.list_db()
-mat = ldb[1]
-mat = "blue-acrylic"
-dbuilder.load_mat(mat)
-print("Loaded " + mat)
-brdf = dbuilder.brdf_function(mat)
-name = mat
 
 ## Create table of all angles
 
@@ -50,36 +53,56 @@ for hi in range(MAX_THETA_H):
             angles[idx] = [phi_ds[pi], theta_ds[di], theta_hs[hi]]
             idx += 1
 
-rgbs = brdf(angles)
-rgbs = 1.0 / (1.0 + rgbs)  # tonemapping
+all_material_params = np.array([])
 
-## Resize to MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3
-rgbs = rgbs.reshape((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3))
+for i in range(len(ldb)):
+    mat = ldb[i]
+    dbuilder.load_mat(mat)
+    print("Loaded " + mat)
+    brdf = dbuilder.brdf_function(mat)
+    name = mat
 
-print(rgbs)
+    rgbs = brdf(angles)
+    rgbs = rgbs / (1.0 + rgbs)  # tonemapping
 
-## Convert to torch tensor
-rgbs = torch.tensor(rgbs, dtype=torch.float32)
-rgbs = rgbs.permute(3, 0, 1, 2)   # C D H W
-rgbs = rgbs.unsqueeze(0)         # 1 C D H W 
-## Pass through model
-params = torch.tensor(
-        [[
-            0.82, 0.67, 0.16,   # baseColor (R,G,B)
-            0.0,                # metallic
-            0.0,                # subsurface
-            0.5,                # specular
-            0.5,                # roughness
-#            0.0,                # specularTint
-            0.0,                # sheen
-            0.5,                # sheenTint
-            0.0,                # clearcoat
-#            1.0                 # clearcoatGloss
-        ]],
-        dtype=torch.float32,
-        device='cuda'
-    )
-with torch.no_grad():
-    output = model(rgbs.to('cuda'), params)
+    ## Resize to MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3
+    rgbs = rgbs.reshape((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3))
 
-print(output)
+    # print(rgbs)
+
+    ## Convert to torch tensor
+    rgbs = torch.tensor(rgbs, dtype=torch.float32)
+    rgbs = rgbs.permute(3, 0, 1, 2)   # C D H W
+    rgbs = rgbs.unsqueeze(0)         # 1 C D H W
+
+    ## Pass through model
+    params = torch.rand(1, latent_space_dim,  device='cuda', dtype=torch.float32)
+    with torch.no_grad():
+        output = model(rgbs.to('cuda'), params)
+
+    params = output[1].cpu().numpy()[0]
+
+    material_params = {
+        "baseColor": params[0:3],
+        "metallic": params[3],
+        "subsurface": 0.0,
+        "specular": params[4],
+        "roughness": params[5],
+        "specularTint": 0.0,
+        "anisotropic": 0.0,
+        "sheen": params[6],
+        "sheenTint": 0.0,
+        "clearcoat": params[7],
+        "clearcoatGloss": 0.0,
+    }
+
+    entry = (name, material_params)
+
+    all_material_params = np.append(all_material_params, entry)
+
+np.savez(f"{output_folder}/{embed_dim}_{latent_space_dim}_{epochs}_{batch_size}.npz", params=all_material_params)
+
+# read file and display one material
+data = np.load(f"{output_folder}/{embed_dim}_{latent_space_dim}_{epochs}_{batch_size}.npz", allow_pickle=True)
+print(data['params'][0])
+print(data['params'][1])

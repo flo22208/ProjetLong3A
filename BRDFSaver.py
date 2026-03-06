@@ -85,7 +85,6 @@ def generate_brdf_random(i):
 
 def generate_brdf_fixed(i, params):
     # Make randomness process-safe
-    rng = np.random.default_rng(seed=i)
 
     baseColor = params[0:3]
     metallic = params[3]

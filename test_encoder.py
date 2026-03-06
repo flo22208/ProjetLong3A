@@ -17,7 +17,7 @@ where_zeros = [4, 7, 9, 11]
 # where_zeros = []
 batch_size = 20
 
-model_file = f"results/encoder_disney_{embed_dim}_{latent_space_dim}_{epochs}_{batch_size}.pt"
+model_file = f"results/encoder_disney_{embed_dim}_{latent_space_dim}_{epochs}_{batch_size}_0.0088.pt"
 
 def load_brdf_file(index=2):
     """
@@ -97,3 +97,7 @@ for i in range(N_tries):
 print(f"Average loss over {N_tries} tries: {np.mean(all_losses):.6f}")
 
 print(f"Average absolute difference per parameter over {N_tries} tries: {np.mean(all_abs_diff_per_params, axis=0)}")
+
+print(f"Standard deviation of absolute difference per Disney parameter over {N_tries} tries: {np.std(all_abs_diff_per_params, axis=0)}")
+
+print(f"Min and max absolute difference per Disney parameter over {N_tries} tries: {np.min(all_abs_diff_per_params, axis=0)}, {np.max(all_abs_diff_per_params, axis=0)}")
