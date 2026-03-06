@@ -7,7 +7,7 @@ from render_jax import optimize_params
 ## load BRDF from MERL database
 dbuilder = db.DBuilder(interp_method="linear",db_path='merlDB/db/brdfs/')
 ldb = dbuilder.list_db()
-mat = "dark-blue-paint"
+mat = "green-metallic-paint"
 dbuilder.load_mat(mat)
 print("Loaded " + mat)
 brdf = dbuilder.brdf_function(mat)
@@ -54,16 +54,16 @@ params_full = {
     "subsurface": params["subsurface"],
     "specular": params["specular"],
     "roughness": params["roughness"],
-    "specularTint" : 0.5,
+    "specularTint" : 0.0,
     "anisotropic" : 0.0,
     "sheen": params["sheen"],
     "sheenTint" : 0.0,
     "clearcoat": params["clearcoat"],
     "clearcoatGloss" : 0.0,
 }
-pred_finale = jnp.moveaxis(pred_finale,0,-1)
 print("MERL mean:", brdf_target.mean(axis=(1,2,3)))
 print("Disney mean:", pred_finale.mean(axis=(1,2,3)))
+pred_finale = jnp.moveaxis(pred_finale,0,-1)
 jnp.savez(f"brdfs_disney/brdf_0.npz",
         params=params_full,
         brdf=pred_finale)
