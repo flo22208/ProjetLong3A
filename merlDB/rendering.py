@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import matplotlib.pyplot as plt
 from .utils import axis_angle_to_matrix, clamp, normalise, ready_to_draw, sample_spheres, angle
@@ -224,6 +226,8 @@ if __name__ == "__main__":
     parser.add_argument('--mat', default=None)
     parser.add_argument('--disneyid', default=None)
     args = parser.parse_args()
+
+    os.makedirs(args.outdir, exist_ok=True)
 
     renderer = Renderer(size=1000, save_path=args.outdir,nb_spheres=1,nb_tours=10,gamma=2.222)
 
