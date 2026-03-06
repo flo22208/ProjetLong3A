@@ -47,7 +47,7 @@ def save_checkpoint(model, optimizer, checkpoint_dir, epoch):
 
 
 
-def train_epoch_disney(wi, wo, N, model, batch_size, dim_latent, BRDF, optimizer, device, epoch, args=None):
+def train_epoch_disney(wi, wo, N, model, batch_size, dim_latent, BRDF, optimizer, device, where_zeros = [], args=None):
     """
     Entraîne le modèle Transformer avec supervision pour une epoch
     
@@ -70,7 +70,9 @@ def train_epoch_disney(wi, wo, N, model, batch_size, dim_latent, BRDF, optimizer
     optimizer.zero_grad()
     
     # Paramètres disney aléatoires et évaluation de la BRDF
-    params_disney = torch.rand(batch_size, dim_latent, device=device)
+    params_disney = torch.rand(batch_size, 12, device=device)
+    for i in where_zeros:
+        params_disney[:, i:i+1] = 0.0
     rgbs = BRDF(params_disney, wi, wo, N)
 
     # Tonemapping
@@ -80,9 +82,18 @@ def train_epoch_disney(wi, wo, N, model, batch_size, dim_latent, BRDF, optimizer
     rgbs = torch.einsum('bdhwc->bcdhw', rgbs)
 
     # Forward pass avec mixed precision
+    model_params_disney = torch.zeros(batch_size, dim_latent, device=device)
+    cpt = 0
+    for i in range(12):
+        if not(params_disney[: , i:i+1].sum() == 0):
+            model_params_disney[:, cpt:cpt+1] = params_disney[:, i:i+1]
+            cpt +=1
+
+    # print(params_disney)
+    # print(model_params_disney)
     with torch.amp.autocast(device_type=device.type):
         loss, pred_params = model(
-            rgbs, params_disney
+            rgbs, model_params_disney
         )
     
     # Vérifier si la loss est finie
@@ -133,11 +144,14 @@ def get_final_prediction(model, BRDF, device):
 if __name__ == "__main__":
       
     # Paramètres du modèle MAE
-    embed_dim = 12                # Dimension des embeddings
-    dim_latent = 12#768                # Dimension de l'espace latent
+    embed_dim = 96                # Dimension des embeddings
+    dim_latent = 8#768                # Dimension de l'espace latent
+    where_zeros=[4, 7, 9, 11]
+    # where_zeros = [7, 11]
+    # where_zeros = []
 
     # Paramètres d'entraînement
-    epochs = 500                   # Nombre d'epochs
+    epochs = 3000                   # Nombre d'epochs
     batch_size = 20                # Batch size 
     lr = 1e-3                      # Learning rate
     
@@ -199,7 +213,8 @@ if __name__ == "__main__":
     
     model = EncoderViT3D(
         embed_dim=embed_dim,
-        latent_space_dim=dim_latent
+        latent_space_dim=dim_latent,
+        # num_heads=embed_dim
     )
     model.to(device)
     
@@ -240,7 +255,7 @@ if __name__ == "__main__":
 
         # Entraînement
         loss = train_epoch_disney(
-            wi, wo, N, model, batch_size, dim_latent, BRDF, optimizer, device, epoch, args=train_args
+            wi, wo, N, model, batch_size, dim_latent, BRDF, optimizer, device, where_zeros=where_zeros, args=train_args
         )
           
         scaler.scale(loss).backward()
@@ -263,7 +278,7 @@ if __name__ == "__main__":
     print("="*70)
 
     ## enregistrer les poids du modèle final
-    final_model_path = os.path.join(outdir, 'encoder_disney.pt')
+    final_model_path = os.path.join(outdir, f'encoder_disney_{embed_dim}_{dim_latent}_{epochs}_{batch_size}.pt')
     torch.save(model.state_dict(), final_model_path)
 
     ## plot des courbes de loss
@@ -273,3 +288,4 @@ if __name__ == "__main__":
     plt.ylabel('Loss')
     plt.title('Training Loss over Epochs')
     plt.savefig(os.path.join(outdir, 'training_loss.png'))
+    plt.show()

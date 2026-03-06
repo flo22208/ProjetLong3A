@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import os
-import utilsBRDFDisney
+import utils
 
 def display_brdf_slice(brdf, phi_d_idx=90, mode="reinhard", exposure=1.0):
     """
@@ -45,5 +45,5 @@ def display_brdf_slice(brdf, phi_d_idx=90, mode="reinhard", exposure=1.0):
     plt.show()
     
 if __name__ == "__main__":
-    utilsBRDFDisney.load_brdf(index=int(0))
-    display_brdf_slice(utilsBRDFDisney.brdf, phi_d_idx=0, mode="reinhard")
+    utils.load_brdf(index=int(0))
+    display_brdf_slice(utils.brdf, phi_d_idx=0, mode="reinhard")
