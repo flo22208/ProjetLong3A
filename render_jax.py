@@ -33,9 +33,9 @@ def loss_fn(params, L, V, N, X, Y, brdf_target):
     subsurface = jax.nn.sigmoid(params["subsurface"])
     pred = BRDF_jitted(L, V, N, X, Y, baseColor=baseColor,
     metallic=metallic,
-    subsurface=0,#subsurface,
+    subsurface=subsurface,
     specular=specular,
-    specularTint=0.5,
+    specularTint=0.0,
     roughness=roughness,
     sheen=sheen,
     sheenTint=0,
@@ -78,9 +78,9 @@ def optimize_params(TH, TD, PH, brdf_target, steps=1000, lr=1e-2): # 2000 5e-3
     params = {k: jax.nn.sigmoid(v) for k, v in params.items()}
     pred_finale = BRDF_jitted(L, V, N, X, Y, baseColor=params["baseColor"],
     metallic=params["metallic"],
-    subsurface=0,#params["subsurface"],
+    subsurface=params["subsurface"],
     specular=params["specular"],
-    specularTint=0.5,
+    specularTint=0.0,
     roughness=params["roughness"],
     sheen=params["sheen"],
     sheenTint=0,
