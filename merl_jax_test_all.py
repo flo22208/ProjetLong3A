@@ -44,6 +44,7 @@ for i in tqdm(range(len(ldb)), desc="Processing materials"):
     brdf_target = brdf_target / (1.0 + brdf_target) # tone mapping
 
     params, _, loss_finale, loss_hist = optimize_params(TH, TD, PH, brdf_target, steps=1000, lr=1e-2)
+    params = np.array(params)
     params_full = {
         "baseColor": params["baseColor"],
         "metallic": params["metallic"],
