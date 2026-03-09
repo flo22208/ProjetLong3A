@@ -57,7 +57,6 @@ for i in tqdm(range(len(ldb)), desc="Processing materials"):
         "clearcoat": params["clearcoat"].item(),
         "clearcoatGloss" : 0.0,
     }
-    print(params_full)
     entry = (name, params_full)
 
     all_material_params = np.append(all_material_params, entry)
