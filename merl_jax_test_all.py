@@ -44,20 +44,20 @@ for i in tqdm(range(len(ldb)), desc="Processing materials"):
     brdf_target = brdf_target / (1.0 + brdf_target) # tone mapping
 
     params, _, loss_finale, loss_hist = optimize_params(TH, TD, PH, brdf_target, steps=1000, lr=1e-2)
-    params = np.array(params)
     params_full = {
-        "baseColor": params["baseColor"],
-        "metallic": params["metallic"],
-        "subsurface": params["subsurface"],
-        "specular": params["specular"],
-        "roughness": params["roughness"],
+        "baseColor": np.array(params["baseColor"]),
+        "metallic": params["metallic"].item(),
+        "subsurface": params["subsurface"].item(),
+        "specular": params["specular"].item(),
+        "roughness": params["roughness"].item(),
         "specularTint" : 0.0,
         "anisotropic" : 0.0,
-        "sheen": params["sheen"],
+        "sheen": params["sheen"].item(),
         "sheenTint" : 0.0,
-        "clearcoat": params["clearcoat"],
+        "clearcoat": params["clearcoat"].item(),
         "clearcoatGloss" : 0.0,
     }
+    print(params_full)
     entry = (name, params_full)
 
     all_material_params = np.append(all_material_params, entry)
