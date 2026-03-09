@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from tqdm.asyncio import tqdm
 from merlDB import database as db
 import jax.numpy as jnp
 from render_jax import optimize_params
@@ -29,11 +30,10 @@ dbuilder = db.DBuilder(interp_method="linear",db_path='merlDB/db/brdfs/')
 ldb = dbuilder.list_db()
 all_material_params = np.array([])
 
-for i in range(len(ldb)):
-
+for i in tqdm(range(len(ldb)), desc="Processing materials"):
     mat = ldb[i]
     dbuilder.load_mat(mat)
-    print("Loaded " + mat)
+    # print("Loaded " + mat)
     brdf = dbuilder.brdf_function(mat)
     name = mat
 
