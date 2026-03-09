@@ -5,7 +5,7 @@ import merlDB.database as db
 from torchBRDF import BRDF, rusinkiewicz_to_LV
 import torch
 
-file = "results/merl_on_encoder/96_8_3000_20.npz"
+file = "results/merl_on_jax/jax.npz"
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # read file
@@ -73,4 +73,5 @@ for i in range(len(data["params"])//2):
     all_losses[mat] = loss
 
 print(all_losses)
+print("Average loss: ", np.mean(list(all_losses.values())))
     
