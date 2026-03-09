@@ -9,12 +9,15 @@ folder_brdfs = "brdfs_disney/"
 
 epochs = 3000
 embed_dim = 96
-latent_space_dim = 10
+latent_space_dim = 8
 where_zeros = [4, 7, 9, 11]
+batch_size = 20
+
+model_file = f"results/encoder_disney_{embed_dim}_{latent_space_dim}_{epochs}_{batch_size}_0.0088.pt"
 
 ## load model for .pt file
 model = EncoderViT3D(embed_dim=embed_dim, latent_space_dim=latent_space_dim)        # instantiate architecture first
-model.load_state_dict(torch.load("results/encoder_disney_96_10_3000_20_0.0096.pt"))
+model.load_state_dict(torch.load(model_file))
 model.to('cuda')
 model.eval()
 
@@ -23,7 +26,7 @@ model.eval()
 dbuilder = db.DBuilder(interp_method="linear",db_path='merlDB/db/brdfs/')
 ldb = dbuilder.list_db()
 mat = ldb[1]
-mat = "red-plastic"
+mat = "dark-blue-paint"
 dbuilder.load_mat(mat)
 print("Loaded " + mat)
 brdf = dbuilder.brdf_function(mat)
@@ -54,7 +57,7 @@ for hi in range(MAX_THETA_H):
             idx += 1
 
 rgbs = brdf(angles)
-rgbs = 1.0 / (1.0 + rgbs)  # tonemapping
+rgbs = rgbs / (1.0 + rgbs)  # tonemapping
 
 ## Resize to MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3
 rgbs = rgbs.reshape((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3))
