@@ -1,8 +1,9 @@
 import time
 from matplotlib import pyplot as plt
+import jaxBRDF
 from merlDB import database as db
 import jax.numpy as jnp
-from render_jax import optimize_params
+from render_jax import BRDF_jitted, optimize_params
 
 ## load BRDF from MERL database
 dbuilder = db.DBuilder(interp_method="linear",db_path='merlDB/db/brdfs/')
@@ -38,7 +39,7 @@ brdf_target = brdf_target / (1.0 + brdf_target) # tone mapping
 
 print("Début de l'optimisation")
 t1 = time.time()
-params, _, loss_finale, loss_hist, pred_finale = optimize_params(TH, TD, PH, brdf_target, steps=1000, lr=1e-2)
+params, _, loss_finale, loss_hist = optimize_params(TH, TD, PH, brdf_target, steps=1000, lr=1e-2)
 t2 = time.time()
 print(f"Finished in {(t2-t1):3f} s")
 print(f"loss finale : {loss_finale:6f}")
@@ -61,9 +62,18 @@ params_full = {
     "clearcoat": params["clearcoat"],
     "clearcoatGloss" : 0.0,
 }
-print("MERL mean:", brdf_target.mean(axis=(1,2,3)))
-print("Disney mean:", pred_finale.mean(axis=(1,2,3)))
-pred_finale = jnp.moveaxis(pred_finale,0,-1)
-jnp.savez(f"brdfs_disney/brdf_0.npz",
-        params=params_full,
-        brdf=pred_finale)
+# L, V, N, X, Y = jaxBRDF.rusinkiewicz_to_LV_jax(TH, 0.0, TD, PH)
+# pred_finale = BRDF_jitted(L, V, N, X, Y, baseColor=params["baseColor"],
+#     metallic=params["metallic"],
+#     subsurface=params["subsurface"],
+#     specular=params["specular"],
+#     specularTint=0.0,
+#     roughness=params["roughness"],
+#     sheen=params["sheen"],
+#     sheenTint=0,
+#     clearcoat=params["clearcoat"],
+#     clearcoatGloss=0)
+# pred_finale = jnp.moveaxis(pred_finale,0,-1)
+# jnp.savez(f"brdfs_disney/brdf_0.npz",
+#         params=params_full,
+#         brdf=pred_finale)
