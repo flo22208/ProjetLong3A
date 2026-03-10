@@ -1,3 +1,5 @@
+from tqdm.asyncio import tqdm
+
 from render_jax import optimize_params
 import jax.numpy as jnp
 import jax
@@ -27,20 +29,19 @@ L, V, N, X, Y = jaxBRDF.rusinkiewicz_to_LV_jax(TH, 0.0, TD, PH)
 all_losses = []
 all_abs_diff_per_params = jnp.array([])
 N_tries = 50
-it = 0
-for i in range(N_tries):
+for i in tqdm(range(N_tries), desc="Processing materials"):
     material_params = {
-        "baseColor": jnp.array(np.random.randn(3)),
-        "metallic": jnp.array( np.random.randn()),
-        "subsurface": jnp.array( np.random.randn()),
-        "specular": jnp.array( np.random.randn()),
-        "roughness": jnp.array( np.random.randn()),
-        # "specularTint": jnp.array( np.random.randn()),
-        # "anisotropic": jnp.array( np.random.randn()),
-        "sheen": jnp.array( np.random.randn()),
-        # "sheenTint": jnp.array( np.random.randn()),
-        "clearcoat": jnp.array( np.random.randn()),
-        # "clearcoatGloss": jnp.array( np.random.randn()),
+        "baseColor": jnp.array(np.random.rand(3)),
+        "metallic": jnp.array( np.random.rand()),
+        "subsurface": jnp.array( np.random.rand()),
+        "specular": jnp.array( np.random.rand()),
+        "roughness": jnp.array( np.random.rand()),
+        # "specularTint": jnp.array( np.random.rand()),
+        # "anisotropic": jnp.array( np.random.rand()),
+        "sheen": jnp.array( np.random.rand()),
+        # "sheenTint": jnp.array( np.random.rand()),
+        "clearcoat": jnp.array( np.random.rand()),
+        # "clearcoatGloss": jnp.array( np.random.rand()),
     }
 
     baseColor = material_params["baseColor"]
@@ -67,18 +68,13 @@ for i in range(N_tries):
     clearcoatGloss=clearcoatGloss)
     brdf_target = brdf_target / (1.0 + brdf_target)
 
-    t1 = time.time()
-    params, params_init_jax, loss_finale, loss_hist, pred_finale = optimize_params(TH, TD, PH, brdf_target, steps=1000, lr=5e-2)
-    t2 = time.time()
-
-    print(f"Finished {i} in {(t2-t1):3f} s")
+    params, params_init_jax, loss_finale, loss_hist = optimize_params(TH, TD, PH, brdf_target, steps=1000, lr=1e-2)
     
-    # detect is there is nan loss and if yes ingore this result and go to next iteration
-    if jnp.isnan(loss_finale):
-        print(f"Loss is nan for try {i}, skipping this result")
-        continue
+    # detect is there is nan loss and if yes retry optimization with a different initialization
+    while jnp.isnan(loss_finale):
+        print(f"Loss is nan for try {i}, retrying with different initialization")
+        params, params_init_jax, loss_finale, loss_hist = optimize_params(TH, TD, PH, brdf_target, steps=1000, lr=1e-2)
 
-    it += 1
     all_losses.append(loss_finale.item())
     temp_abs_diff_per_param = jnp.abs(material_params["baseColor"] - params["baseColor"])
     temp_abs_diff_per_param = jnp.concatenate([temp_abs_diff_per_param, jnp.abs(material_params["metallic"] - params["metallic"]).reshape(1),
@@ -99,7 +95,7 @@ for i in range(N_tries):
     
     
 
-print(f"Average loss on BRDFs over {it} tries: {(sum(all_losses)/it):.6f}")
+print(f"Average loss on BRDFs over {N_tries} tries: {(sum(all_losses)/N_tries):.6f}")
 
 print(f"Average absolute difference per Disney parameter over {N_tries} tries: {jnp.mean(all_abs_diff_per_params, axis=0)}")
 

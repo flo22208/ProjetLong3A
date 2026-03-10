@@ -63,17 +63,17 @@ def BRDF(
     N,
     X,
     Y,
-    baseColor=np.array([0.82, 0.67, 0.16]),
+    baseColor=np.array([0.0, 0.0, 0.0]),
     metallic=0.0,
     subsurface=0.0,
-    specular=0.5,
-    roughness=0.5,
+    specular=0.0,
+    roughness=0.0,
     specularTint=0.0,
     anisotropic=0.0,
     sheen=0.0,
-    sheenTint=0.5,
+    sheenTint=0.0,
     clearcoat=0.0,
-    clearcoatGloss=1.0,
+    clearcoatGloss=0.0,
 ):
     NdotL = np.dot(N, L)
     NdotV = np.dot(N, V)
