@@ -75,6 +75,11 @@ def train_epoch_disney(wi, wo, N, model, batch_size, dim_latent, BRDF, optimizer
         params_disney[:, i:i+1] = 0.0
     rgbs = BRDF(params_disney, wi, wo, N)
 
+    # test if there are nans
+    if torch.isnan(rgbs).any():
+        print("NaNs in BRDF output, stopping training")
+        sys.exit(1)
+    
     # Tonemapping
     mask = torch.isinf(rgbs)
     rgbs = rgbs / (1 + rgbs)
@@ -151,9 +156,9 @@ if __name__ == "__main__":
     # where_zeros = []
 
     # Paramètres d'entraînement
-    epochs = 3000                   # Nombre d'epochs
+    epochs = 6000                   # Nombre d'epochs
     batch_size = 20                # Batch size 
-    lr = 1e-3                      # Learning rate
+    lr = 2e-3                      # Learning rate
     
 
     # Chemins et répertoires

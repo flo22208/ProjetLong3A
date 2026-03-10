@@ -9,7 +9,7 @@ from torchBRDF import BRDF, rusinkiewicz_to_LV
 
 folder_brdfs = "brdfs_disney/"
 
-epochs = 3000
+epochs = 6000
 embed_dim = 96
 latent_space_dim = 8
 where_zeros = [4, 7, 9, 11]
@@ -17,7 +17,7 @@ where_zeros = [4, 7, 9, 11]
 # where_zeros = []
 batch_size = 20
 
-model_file = f"results/encoder_disney_{embed_dim}_{latent_space_dim}_{epochs}_{batch_size}_0.0088.pt"
+model_file = f"results/encoder_disney_{embed_dim}_{latent_space_dim}_{epochs}_{batch_size}.pt"
 
 ## load model for .pt file
 model = EncoderViT3D(embed_dim=embed_dim, latent_space_dim=latent_space_dim)        # instantiate architecture first

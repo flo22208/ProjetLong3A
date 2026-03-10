@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 import math
+import numpy as np
 
 PI = math.pi
 
@@ -93,8 +94,15 @@ def BRDF(params, wi, wo, N):
     clearcoatGloss = params[:,11:12].view(B,1,1,1,1)
 
     # dot products
-    NdotL = (N * wi).sum(-1, keepdim=True).clamp(min=0)
-    NdotV = (N * wo).sum(-1, keepdim=True).clamp(min=0)
+    # dot products
+    NdotL_raw = (N * wi).sum(-1, keepdim=True)
+    NdotV_raw = (N * wo).sum(-1, keepdim=True)
+
+    # Mask: both must be > 0 (mirrors numpy's early-exit)
+    valid = ((NdotL_raw > 0) & (NdotV_raw > 0)).float()
+
+    NdotL = NdotL_raw.clamp(min=0)
+    NdotV = NdotV_raw.clamp(min=0)
 
     Hvec = F.normalize(wi + wo, dim=-1)
     NdotH = (N * Hvec).sum(-1, keepdim=True).clamp(min=0)
@@ -162,8 +170,11 @@ def BRDF(params, wi, wo, N):
     Gr = smithG_GGX(NdotL, 0.25) * smithG_GGX(NdotV, 0.25)
 
     clear = 0.25 * clearcoat * Gr * Fr * Dr
+    res = torch.zeros(diffuse.shape, device=device)
 
-    return diffuse + spec + clear
+    res = torch.where(valid > 0, diffuse + spec + clear, torch.zeros_like(diffuse))
+    return res
+    # return (diffuse + spec + clear) * valid
 
 # ==========================
 # Torch rusinkiewicz to LV
@@ -236,4 +247,30 @@ if __name__ == "__main__":
         device=device
     )
 
-    torch_output = BRDF(params, wi, wo, N)[0].cpu().numpy()
+    numpy_output = BRDF(params, wi, wo, N)[0].cpu().numpy()
+
+    ### reshape to (D,H,W,3)
+    D, H, W = 90, 90, 180
+    numpy_output = numpy_output.reshape(D, H, W, 3)
+
+    print("Torch BRDF output shape:", numpy_output.shape)
+
+    # Save to file with params
+    material_params = {
+            "baseColor": params[0, 0:3].cpu().numpy(),
+            "metallic": params[0, 3].item(),
+            "subsurface": params[0, 4].item(),
+            "specular": params[0, 5].item(),
+            "roughness": params[0, 6].item(),
+            "specularTint": params[0, 7].item(),
+            "anisotropic": 0.0,
+            "sheen": params[0, 8].item(),
+            "sheenTint": params[0, 9].item(),
+            "clearcoat": params[0, 10].item(),
+            "clearcoatGloss": params[0, 11].item(),
+        }
+    
+    np.savez(f"brdfs_disney/brdf_0.npz",
+             params=material_params,
+             brdf=numpy_output)
+
