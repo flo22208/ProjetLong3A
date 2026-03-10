@@ -1,11 +1,13 @@
-
-
 import torch
 import torch.nn as nn
 import numpy as np
 
+import jaxBRDF
 from model import EncoderViT3D
 from numpyBRDF import BRDF, rusinkiewicz_to_LV
+from render_jax import optimize_params
+import jax.numpy as jnp
+import jax
 
 folder_brdfs = "brdfs_disney/"
 
@@ -30,6 +32,9 @@ MAX_PHI_D = 180
 theta_hs = np.deg2rad(np.linspace(0, RES_THETA_H, MAX_THETA_H))
 theta_ds = np.deg2rad(np.linspace(0, RES_THETA_D, MAX_THETA_D))
 phi_ds = np.deg2rad(np.linspace(0, RES_PHI_D, MAX_PHI_D))
+
+TH, TD, PH = jnp.meshgrid(theta_hs, theta_ds, phi_ds, indexing="ij")
+L, V, N, X, Y = jaxBRDF.rusinkiewicz_to_LV_jax(TH, 0.0, TD, PH)
 
 model_file = f"results/encoder_disney_{embed_dim}_{latent_space_dim}_{epochs}_{batch_size}_0.0088.pt"
 
@@ -88,17 +93,17 @@ if __name__ == "__main__":
                 if vals[0] != -1:
                     brdf[hi, di, pi] = vals
 
-    brdf = brdf / (1 + brdf)
+    gt_brdf = brdf / (1 + brdf)
 
     np.savez(f"{folder_brdfs}/brdf_0.npz",
             params=material_params,
-            brdf=brdf)
+            brdf=gt_brdf)
 
     #### Intermediary : convert the GT BRDF to torch
     rgbs_model = torch.tensor(brdf, device='cuda', dtype=torch.float32).unsqueeze(0)  # add batch dimension
     rgbs_model = torch.einsum('bdhwc->bcdhw', rgbs_model)
 
-    #### Prediction : pass through model, compute BRDF, save
+    #### Prediction on model: pass through model, compute BRDF, save
     with torch.no_grad():
         output = model(
                     rgbs_model, model_params_disney
@@ -118,7 +123,7 @@ if __name__ == "__main__":
             "clearcoat": params[7],
             "clearcoatGloss": 0.0,
         }
-    print(f"pred params: {material_params}")
+    print(f"pred params encoder: {material_params}")
 
     brdf = np.zeros((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3), dtype=np.float32)
 
@@ -149,6 +154,55 @@ if __name__ == "__main__":
             params=material_params,
             brdf=brdf)
     
-    #### 
+    #### Now "predict" via gradient descent from optimize_params, save the result as well
+    gt_brdf = jnp.moveaxis(gt_brdf, -1, 0)
+    params, params_init_jax, loss_finale, loss_hist = optimize_params(TH, TD, PH, gt_brdf, steps=1000, lr=1e-2)
+    while jnp.isnan(loss_finale):
+        print(f"Loss is nan for try {i}, retrying with different initialization")
+        params, params_init_jax, loss_finale, loss_hist = optimize_params(TH, TD, PH, gt_brdf, steps=1000, lr=1e-2)
 
+    material_params = {
+            "baseColor": np.array(params["baseColor"]),
+            "metallic": params["metallic"].item(),
+            "subsurface": params["subsurface"].item(),
+            "specular": params["specular"].item(),
+            "roughness": params["roughness"].item(),
+            "specularTint": 0.0,
+            "anisotropic": 0.0,
+            "sheen": params["sheen"].item(),
+            "sheenTint": 0.0,
+            "clearcoat": params["clearcoat"].item(),
+            "clearcoatGloss": 0.0,
+        }
+    print(f"pred params optimization: {material_params}")
+
+    brdf = np.zeros((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3), dtype=np.float32)
+
+    for hi in range(MAX_THETA_H):
+        for di in range(MAX_THETA_D):
+            for pi in range(MAX_PHI_D):
+                theta_h = theta_hs[hi]
+                theta_d = theta_ds[di]
+                phi_d = phi_ds[pi]
+
+                L, V, N_vec, X, Y = rusinkiewicz_to_LV(
+                    theta_h, 0, theta_d, phi_d
+                )
+                vals = BRDF(
+                    L, V, N_vec, X, Y,
+                    baseColor=material_params["baseColor"], metallic=material_params["metallic"], subsurface=material_params["subsurface"],
+                    specular=material_params["specular"], roughness=material_params["roughness"], specularTint=material_params["specularTint"],
+                    anisotropic=material_params["anisotropic"], sheen=material_params["sheen"], sheenTint=material_params["sheenTint"],
+                    clearcoat=material_params["clearcoat"], clearcoatGloss=material_params["clearcoatGloss"]
+                )
+                if vals[0] != -1:
+                    brdf[hi, di, pi] = vals
+
+    # Tonemapping
+    brdf = brdf / (1 + brdf)
+
+    np.savez(f"{folder_brdfs}/brdf_2.npz",
+            params=material_params,
+            brdf=brdf)
+    
     print("Done")
