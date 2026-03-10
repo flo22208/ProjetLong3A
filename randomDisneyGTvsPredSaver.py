@@ -4,6 +4,7 @@ import numpy as np
 
 import jaxBRDF
 from model import EncoderViT3D
+import torchBRDF
 from numpyBRDF import BRDF, rusinkiewicz_to_LV
 from render_jax import optimize_params
 import jax.numpy as jnp
@@ -99,14 +100,20 @@ if __name__ == "__main__":
             params=material_params,
             brdf=gt_brdf)
 
-    #### Intermediary : convert the GT BRDF to torch
-    rgbs_model = torch.tensor(brdf, device='cuda', dtype=torch.float32).unsqueeze(0)  # add batch dimension
-    rgbs_model = torch.einsum('bdhwc->bcdhw', rgbs_model)
+    #### Intermediary : recompute the BRDF with torch from the GT parameters
+    wi, wo, N = torchBRDF.rusinkiewicz_to_LV('cuda')
+    rgbs = torchBRDF.BRDF(params_disney, wi, wo, N)
+
+    # Tonemapping
+    mask = torch.isinf(rgbs)
+    rgbs = rgbs / (1 + rgbs)
+    rgbs[mask] = 1.0
+    rgbs = torch.einsum('bdhwc->bcdhw', rgbs)
 
     #### Prediction on model: pass through model, compute BRDF, save
     with torch.no_grad():
         output = model(
-                    rgbs_model, model_params_disney
+                    rgbs, model_params_disney
                 )
 
     params = output[1].cpu().numpy()[0]
