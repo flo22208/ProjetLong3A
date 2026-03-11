@@ -3,12 +3,13 @@ from matplotlib import pyplot as plt
 import jaxBRDF
 from merlDB import database as db
 import jax.numpy as jnp
+import numpy as np
 from render_jax import BRDF_jitted, optimize_params
 
 ## load BRDF from MERL database
 dbuilder = db.DBuilder(interp_method="linear",db_path='merlDB/db/brdfs/')
 ldb = dbuilder.list_db()
-mat = "green-metallic-paint"
+mat = "green-metallic-paint2"
 dbuilder.load_mat(mat)
 print("Loaded " + mat)
 brdf = dbuilder.brdf_function(mat)
@@ -50,30 +51,33 @@ plt.ylabel("Loss")
 plt.title("BRDF fitting loss")
 plt.show()
 params_full = {
-    "baseColor": params["baseColor"],
-    "metallic": params["metallic"],
-    "subsurface": params["subsurface"],
-    "specular": params["specular"],
-    "roughness": params["roughness"],
+    "baseColor": np.array(params["baseColor"]),
+    "metallic": params["metallic"].item(),
+    "subsurface": params["subsurface"].item(),
+    "specular": params["specular"].item(),
+    "roughness": params["roughness"].item(),
     "specularTint" : 0.0,
     "anisotropic" : 0.0,
-    "sheen": params["sheen"],
+    "sheen": params["sheen"].item(),
     "sheenTint" : 0.0,
-    "clearcoat": params["clearcoat"],
+    "clearcoat": params["clearcoat"].item(),
     "clearcoatGloss" : 0.0,
 }
-# L, V, N, X, Y = jaxBRDF.rusinkiewicz_to_LV_jax(TH, 0.0, TD, PH)
-# pred_finale = BRDF_jitted(L, V, N, X, Y, baseColor=params["baseColor"],
-#     metallic=params["metallic"],
-#     subsurface=params["subsurface"],
-#     specular=params["specular"],
-#     specularTint=0.0,
-#     roughness=params["roughness"],
-#     sheen=params["sheen"],
-#     sheenTint=0,
-#     clearcoat=params["clearcoat"],
-#     clearcoatGloss=0)
-# pred_finale = jnp.moveaxis(pred_finale,0,-1)
-# jnp.savez(f"brdfs_disney/brdf_0.npz",
-#         params=params_full,
-#         brdf=pred_finale)
+print(f"Optimized parameters: {params_full}")
+L, V, N, X, Y = jaxBRDF.rusinkiewicz_to_LV_jax(TH, 0.0, TD, PH)
+pred_finale = BRDF_jitted(L, V, N, X, Y, baseColor=params["baseColor"],
+    metallic=params["metallic"],
+    subsurface=params["subsurface"],
+    specular=params["specular"],
+    specularTint=0.0,
+    roughness=params["roughness"],
+    sheen=params["sheen"],
+    sheenTint=0,
+    clearcoat=params["clearcoat"],
+    clearcoatGloss=0)
+pred_finale = jnp.moveaxis(pred_finale,0,-1)
+pred_finale = np.array(pred_finale)
+pred_finale = pred_finale / (1 + pred_finale) # tonemapping
+jnp.savez(f"brdfs_disney/brdf_0.npz",
+        params=params_full,
+        brdf=pred_finale)

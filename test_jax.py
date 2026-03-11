@@ -28,7 +28,7 @@ L, V, N, X, Y = jaxBRDF.rusinkiewicz_to_LV_jax(TH, 0.0, TD, PH)
 
 all_losses = []
 all_abs_diff_per_params = jnp.array([])
-N_tries = 50
+N_tries = 100
 for i in tqdm(range(N_tries), desc="Processing materials"):
     material_params = {
         "baseColor": jnp.array(np.random.rand(3)),

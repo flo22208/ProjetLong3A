@@ -4,16 +4,17 @@ import random
 from merlDB import database as db
 import numpy as np
 from numpyBRDF import BRDF, rusinkiewicz_to_LV
+import torchBRDF
 
 folder_brdfs = "brdfs_disney/"
 
-epochs = 3000
+epochs = 6000
 embed_dim = 96
 latent_space_dim = 8
 where_zeros = [4, 7, 9, 11]
 batch_size = 20
 
-model_file = f"results/encoder_disney_{embed_dim}_{latent_space_dim}_{epochs}_{batch_size}_0.0088.pt"
+model_file = f"results/encoder_disney_{embed_dim}_{latent_space_dim}_{epochs}_{batch_size}_0.0064.pt"
 
 ## load model for .pt file
 model = EncoderViT3D(embed_dim=embed_dim, latent_space_dim=latent_space_dim)        # instantiate architecture first
@@ -26,7 +27,7 @@ model.eval()
 dbuilder = db.DBuilder(interp_method="linear",db_path='merlDB/db/brdfs/')
 ldb = dbuilder.list_db()
 mat = ldb[1]
-mat = "dark-blue-paint"
+mat = "green-metallic-paint"
 dbuilder.load_mat(mat)
 print("Loaded " + mat)
 brdf = dbuilder.brdf_function(mat)
@@ -73,7 +74,24 @@ with torch.no_grad():
 
 params = output[1].cpu().numpy()[0]
 
-print(f"params: {params}")
+# Convert params to a tensor with 12 dimensions, filling the missing ones with 0
+params_disney = torch.zeros(1, 12, device='cuda')
+cpt = 0
+for i in range(12):
+    if not(i in where_zeros):
+        params_disney[:, i:i+1] = output[1][:, cpt:cpt+1]
+        cpt += 1
+
+wi, wo, N = torchBRDF.rusinkiewicz_to_LV('cuda')
+brdf = torchBRDF.BRDF(params_disney, wi, wo, N)
+
+mask = torch.isinf(brdf)
+brdf = brdf / (1 + brdf)
+brdf[mask] = 1.0
+
+brdf = brdf.reshape((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3))
+
+brdf = brdf.cpu().numpy()
 
 material_params = {
         "baseColor": params[0:3],
@@ -89,27 +107,8 @@ material_params = {
         "clearcoatGloss": 0.0,
     }
 
-brdf = np.zeros((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3), dtype=np.float32)
+print(f'Predicted parameters: {material_params}')
 
-for hi in range(MAX_THETA_H):
-    for di in range(MAX_THETA_D):
-        for pi in range(MAX_PHI_D):
-            theta_h = theta_hs[hi]
-            theta_d = theta_ds[di]
-            phi_d = phi_ds[pi]
-            L, V, N_vec, X, Y = rusinkiewicz_to_LV(
-                theta_h, 0, theta_d, phi_d
-            )
-            vals = BRDF(
-                L, V, N_vec, X, Y,
-                material_params["baseColor"], material_params["metallic"], material_params["subsurface"],
-                material_params["specular"], material_params["roughness"], material_params["specularTint"],
-                material_params["anisotropic"], material_params["sheen"], material_params["sheenTint"],
-                material_params["clearcoat"], material_params["clearcoatGloss"]
-            )
-            if vals[0] != -1:
-                brdf[hi, di, pi] = vals
-            
 np.savez(f"{folder_brdfs}/brdf_0.npz",
          params=material_params,
          brdf=brdf)

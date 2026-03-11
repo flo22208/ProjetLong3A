@@ -77,6 +77,8 @@ def generate_brdf_random(i):
                 if vals[0] != -1:
                     brdf[hi, di, pi] = vals
 
+    brdf = brdf / (1 + brdf)
+
     np.savez(f"{folder_brdfs}/brdf_{i}.npz",
              params=material_params,
              brdf=brdf)
@@ -134,6 +136,8 @@ def generate_brdf_fixed(i, params):
                 )
                 if vals[0] != -1:
                     brdf[hi, di, pi] = vals
+
+    brdf = brdf / (1 + brdf)
 
     np.savez(f"{folder_brdfs}/brdf_{i}.npz",
              params=material_params,

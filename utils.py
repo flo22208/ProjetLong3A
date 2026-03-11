@@ -39,7 +39,7 @@ def load_brdf_file(index=2):
     # Load selected BRDF
     sample = np.load(f"{folder_brdfs}/brdf_{index}.npz", allow_pickle=True)
     brdf = sample["brdf"]
-    brdf = brdf / (1.0 + brdf)
+    # brdf = brdf / (1.0 + brdf) tonemapping has to be already done in the file in some way
     params = sample["params"]
 
     # Load angles (only once)

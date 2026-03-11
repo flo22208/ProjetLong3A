@@ -72,7 +72,7 @@ if __name__ == "__main__":
         }
     print(f"gt params: {material_params}")
     
-    brdf = np.zeros((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3), dtype=np.float32)
+    gt_brdf = np.zeros((MAX_THETA_H, MAX_THETA_D, MAX_PHI_D, 3), dtype=np.float32)
 
     for hi in range(MAX_THETA_H):
         for di in range(MAX_THETA_D):
@@ -92,9 +92,9 @@ if __name__ == "__main__":
                     clearcoat=material_params["clearcoat"], clearcoatGloss=material_params["clearcoatGloss"]
                 )
                 if vals[0] != -1:
-                    brdf[hi, di, pi] = vals
+                    gt_brdf[hi, di, pi] = vals
 
-    gt_brdf = brdf / (1 + brdf)
+    gt_brdf = gt_brdf / (1 + gt_brdf)
 
     np.savez(f"{folder_brdfs}/brdf_0.npz",
             params=material_params,
